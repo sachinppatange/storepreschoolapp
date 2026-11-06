@@ -27,6 +27,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     db()->prepare('UPDATE orders SET school_name=?, mobile=?, address=?, city=?, pincode=? WHERE id=?')
         ->execute([$school, $mobile, $address, $city, $pin, (int) $order['id']]);
     $fresh = find_order_by_id((int) $order['id']);
+    $newStore = (int) ($_POST['dark_store_id'] ?? 0);
+    if ($fresh && $newStore !== (int) ($fresh['dark_store_id'] ?? 0)) {
+        $moved = reassign_dark_store($fresh, $newStore);
+        if (!$moved['ok']) {
+            flash('error', $moved['error']);
+            redirect(url('admin/order.php?no=' . rawurlencode($order['order_number'])));
+        }
+        $fresh = find_order_by_id((int) $order['id']);
+    }
     $result = change_order_state($fresh, $payment, $delivery, $note);
     flash($result['ok'] ? 'success' : 'error', $result['ok'] ? 'Order updated.' : $result['error']);
     redirect(url('admin/order.php?no=' . rawurlencode($order['order_number'])));
@@ -55,6 +64,14 @@ require __DIR__ . '/includes/header.php';
         <?= csrf_field() ?>
         <input type="hidden" name="order_number" value="<?= e($order['order_number']) ?>">
         <h2>Payment and delivery</h2>
+        <label class="field">Dark store
+            <select name="dark_store_id">
+                <option value="0">Unassigned</option>
+                <?php foreach (dark_stores_all() as $store): ?>
+                    <option value="<?= (int) $store['id'] ?>"<?= (int) ($order['dark_store_id'] ?? 0) === (int) $store['id'] ? ' selected' : '' ?>><?= e($store['name']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </label>
         <label class="field">Payment
             <select name="payment_status"><?php foreach (payment_statuses() as $key => $label): ?><option value="<?= e($key) ?>"<?= $order['payment_status'] === $key ? ' selected' : '' ?>><?= e($label) ?></option><?php endforeach; ?></select>
         </label>

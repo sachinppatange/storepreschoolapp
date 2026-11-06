@@ -53,8 +53,13 @@ $searchValue = trim((string) ($_GET['q'] ?? ''));
         <?php endif; ?>
         <div class="header-actions">
             <?php if ($user): ?>
-                <a class="header-link" href="<?= e(url($user['role'] === 'admin' ? 'admin/index.php' : 'account.php')) ?>">
-                    <?= e($user['role'] === 'admin' ? 'Admin' : strtok($user['name'], ' ')) ?>
+                <a class="header-link" href="<?= e(role_home($user)) ?>">
+                    <?= e(match ($user['role']) {
+                        'admin' => 'Admin',
+                        'vendor' => 'Vendor',
+                        'store' => 'Dark store',
+                        default => strtok($user['name'], ' ') ?: 'Account',
+                    }) ?>
                 </a>
             <?php else: ?>
                 <a class="header-link" href="<?= e(url('login.php')) ?>">Login</a>

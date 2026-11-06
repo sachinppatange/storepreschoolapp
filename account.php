@@ -70,6 +70,8 @@ require __DIR__ . '/includes/header.php';
         <a href="<?= e(url('wishlist.php')) ?>">Wishlist</a>
         <a href="<?= e(url('bulk-order.php')) ?>">Bulk order for a school</a>
         <?php if ($user['role'] === 'admin'): ?><a href="<?= e(url('admin/index.php')) ?>">Open admin panel</a><?php endif; ?>
+        <?php if ($user['role'] === 'vendor'): ?><a href="<?= e(url('vendor/index.php')) ?>">Vendor stock</a><?php endif; ?>
+        <?php if ($user['role'] === 'store'): ?><a href="<?= e(url('store/index.php')) ?>">Dark store orders</a><?php endif; ?>
     </div>
     <div class="two">
         <form method="post" class="panel">

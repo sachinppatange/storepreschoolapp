@@ -30,6 +30,10 @@ $sql .= ' ORDER BY id DESC LIMIT 200';
 $stmt = db()->prepare($sql);
 $stmt->execute($params);
 $orders = $stmt->fetchAll();
+$storeNames = [];
+foreach (dark_stores_all() as $store) {
+    $storeNames[(int) $store['id']] = $store['name'];
+}
 
 $pageTitle = 'Orders';
 $active = 'orders';
@@ -44,12 +48,13 @@ require __DIR__ . '/includes/header.php';
 </form>
 <div class="table-wrap">
     <table>
-        <thead><tr><th>Order</th><th>Customer</th><th>Total</th><th>Payment</th><th>Delivery</th><th>Placed</th></tr></thead>
+        <thead><tr><th>Order</th><th>Customer</th><th>Dark store</th><th>Total</th><th>Payment</th><th>Delivery</th><th>Placed</th></tr></thead>
         <tbody>
         <?php foreach ($orders as $order): ?>
             <tr>
                 <td><a href="order.php?no=<?= e(rawurlencode($order['order_number'])) ?>"><?= e($order['order_number']) ?></a><br><?= e($order['order_type']) ?></td>
                 <td><?= e($order['customer_name']) ?><br><?= e($order['school_name']) ?><br><?= e($order['mobile']) ?></td>
+                <td><?= e($storeNames[(int) ($order['dark_store_id'] ?? 0)] ?? 'Unassigned') ?></td>
                 <td><?= money($order['total']) ?></td>
                 <td><?= e($order['payment_status']) ?><br><?= e($order['payment_method']) ?></td>
                 <td><?= e(str_replace('_', ' ', $order['delivery_status'])) ?></td>

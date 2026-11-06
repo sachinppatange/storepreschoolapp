@@ -107,6 +107,11 @@ require __DIR__ . '/includes/header.php';
             <div class="two">
                 <label class="field">City<input name="city" required value="<?= e($value('city', (string) ($user['city'] ?? ''))) ?>"></label>
                 <label class="field">PIN code<input name="pincode" inputmode="numeric" required value="<?= e($value('pincode', (string) ($user['pincode'] ?? ''))) ?>"></label>
+                <?php
+                $pinPreview = preg_replace('/\D/', '', (string) $value('pincode', (string) ($user['pincode'] ?? ''))) ?? '';
+                $serving = dark_store_for_pincode($pinPreview);
+                ?>
+                <p class="small muted"><?= $serving ? e($serving['name']) . ' will pack this order.' : 'A dark store is assigned when this PIN is covered. Other PINs stay with the shop until a store is chosen.' ?></p>
             </div>
             <label class="field">Notes for delivery<textarea name="notes" rows="2"><?= e($value('notes')) ?></textarea></label>
             <?php if ($user): ?>

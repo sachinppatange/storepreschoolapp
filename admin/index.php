@@ -10,6 +10,7 @@ $stats = [
     'Customers' => (string) db()->query("SELECT COUNT(*) FROM users WHERE role = 'customer'")->fetchColumn(),
     'Pending payment' => (string) db()->query("SELECT COUNT(*) FROM orders WHERE payment_status = 'pending' AND delivery_status <> 'cancelled'")->fetchColumn(),
     'Low stock' => (string) db()->query('SELECT COUNT(*) FROM products WHERE is_active = 1 AND stock <= 10')->fetchColumn(),
+    'At dark stores' => (string) db()->query("SELECT COUNT(*) FROM orders WHERE dark_store_id IS NOT NULL AND delivery_status IN ('placed','confirmed','packed','shipped','out_for_delivery')")->fetchColumn(),
 ];
 $recent = db()->query('SELECT * FROM orders ORDER BY id DESC LIMIT 8')->fetchAll();
 $low = db()->query('SELECT name, stock, sku FROM products WHERE is_active = 1 AND stock <= 10 ORDER BY stock ASC LIMIT 6')->fetchAll();

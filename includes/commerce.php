@@ -591,12 +591,20 @@ function place_order(array $customer, array $lines, string $method, string $type
             $pdo->rollBack();
             return $priced;
         }
+        $store = dark_store_for_pincode((string) $customer['pincode']);
+        if ($store) {
+            $short = store_stock_shortfall((int) $store['id'], $priced['items']);
+            if ($short) {
+                $pdo->rollBack();
+                return ['ok' => false, 'error' => $short];
+            }
+        }
         $number = make_order_number();
         $deductNow = $method === 'cod' ? 1 : 0;
         $stmt = $pdo->prepare('INSERT INTO orders
             (order_number, user_id, order_type, customer_name, email, school_name, mobile, address, city, pincode, notes,
-             subtotal, discount, coupon_code, delivery_fee, total, payment_method, payment_status, delivery_status, stock_deducted)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+             subtotal, discount, coupon_code, delivery_fee, total, payment_method, payment_status, delivery_status, stock_deducted, dark_store_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
         $stmt->execute([
             $number,
             $customer['user_id'],
@@ -618,18 +626,15 @@ function place_order(array $customer, array $lines, string $method, string $type
             'pending',
             'placed',
             $deductNow,
+            $store['id'] ?? null,
         ]);
         $orderId = (int) $pdo->lastInsertId();
         $itemStmt = $pdo->prepare('INSERT INTO order_items (order_id, product_id, product_name, unit_price, quantity, line_total) VALUES (?, ?, ?, ?, ?, ?)');
-        $stockStmt = $pdo->prepare('UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?');
         foreach ($priced['items'] as $item) {
             $itemStmt->execute([$orderId, $item['id'], $item['name'], $item['price'], $item['qty'], $item['line_total']]);
-            if ($deductNow) {
-                $stockStmt->execute([$item['qty'], $item['id'], $item['qty']]);
-                if ($stockStmt->rowCount() !== 1) {
-                    throw new RuntimeException('Stock changed for ' . $item['name'] . '. Please review the cart.');
-                }
-            }
+        }
+        if ($deductNow && !deduct_order_stock($orderId)) {
+            throw new RuntimeException('Stock changed while placing the order. Please review the cart.');
         }
         if ($priced['coupon']) {
             $couponStmt = $pdo->prepare('UPDATE coupons SET used_count = used_count + 1 WHERE id = ? AND (usage_limit IS NULL OR used_count < usage_limit)');
@@ -639,6 +644,9 @@ function place_order(array $customer, array $lines, string $method, string $type
             }
         }
         $note = $type === 'bulk' ? 'Bulk order placed' : ($method === 'cod' ? 'Cash on delivery order placed' : 'Order placed');
+        if ($store) {
+            $note .= ' at ' . $store['name'];
+        }
         $pdo->prepare('INSERT INTO order_status_logs (order_id, status, note) VALUES (?, ?, ?)')->execute([$orderId, 'placed', $note]);
         $pdo->commit();
     } catch (Throwable $e) {
@@ -725,24 +733,40 @@ function valid_order_number(string $number): bool
 
 function restore_order_stock(int $orderId): void
 {
+    $order = find_order_by_id($orderId);
+    $storeId = (int) ($order['dark_store_id'] ?? 0);
     $items = order_items($orderId);
     $stmt = db()->prepare('UPDATE products SET stock = stock + ? WHERE id = ?');
     foreach ($items as $item) {
         if ($item['product_id']) {
             $stmt->execute([(int) $item['quantity'], (int) $item['product_id']]);
+            if ($storeId > 0) {
+                add_store_stock($storeId, (int) $item['product_id'], (int) $item['quantity']);
+            }
         }
     }
 }
 
 function deduct_order_stock(int $orderId): bool
 {
+    $order = find_order_by_id($orderId);
+    $storeId = (int) ($order['dark_store_id'] ?? 0);
     $items = order_items($orderId);
     $stmt = db()->prepare('UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?');
+    $storeStmt = db()->prepare('UPDATE store_stock SET quantity = quantity - ? WHERE dark_store_id = ? AND product_id = ? AND quantity >= ?');
     foreach ($items as $item) {
         if (!$item['product_id']) {
             return false;
         }
-        $stmt->execute([(int) $item['quantity'], (int) $item['product_id'], (int) $item['quantity']]);
+        $qty = (int) $item['quantity'];
+        $productId = (int) $item['product_id'];
+        if ($storeId > 0) {
+            $storeStmt->execute([$qty, $storeId, $productId, $qty]);
+            if ($storeStmt->rowCount() !== 1) {
+                return false;
+            }
+        }
+        $stmt->execute([$qty, $productId, $qty]);
         if ($stmt->rowCount() !== 1) {
             return false;
         }

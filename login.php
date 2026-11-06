@@ -12,6 +12,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require_csrf();
     $result = attempt_login((string) ($_POST['email'] ?? ''), (string) ($_POST['password'] ?? ''));
     if ($result['ok']) {
+        $user = $result['user'];
+        if (in_array($user['role'], ['admin', 'vendor', 'store'], true) && ($next === url('account.php') || $next === url())) {
+            $next = role_home($user);
+        }
         redirect($next);
     }
     $error = $result['error'];
@@ -28,7 +32,9 @@ require __DIR__ . '/includes/header.php';
         <?php if (DEMO_MODE): ?>
             <div class="demo-box small">
                 <strong>Demo parent</strong><br>parent@example.com · Parent@123<br>
-                <strong>Demo admin</strong><br>admin@storepreschoolapp.in · Admin@123
+                <strong>Demo admin</strong><br>admin@storepreschoolapp.in · Admin@123<br>
+                <strong>Vendor</strong><br>vendor@storepreschoolapp.in · Vendor@123<br>
+                <strong>Dark store</strong><br>store@storepreschoolapp.in · Store@123
             </div>
         <?php endif; ?>
         <?php if ($error): ?><div class="alert-bad"><?= e($error) ?></div><?php endif; ?>

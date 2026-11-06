@@ -5,6 +5,7 @@ require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/functions.php';
 require_once __DIR__ . '/commerce.php';
+require_once __DIR__ . '/fulfillment.php';
 require_once __DIR__ . '/ui.php';
 
 if (APP_DEBUG) {
@@ -53,6 +54,7 @@ set_exception_handler(static function (Throwable $e): void {
 
 try {
     db()->query('SELECT 1 FROM users LIMIT 1');
+    ensure_fulfillment_schema();
 } catch (Throwable $e) {
     render_setup_screen($e->getMessage());
 }
