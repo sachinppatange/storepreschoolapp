@@ -157,18 +157,100 @@
         });
     }
 
+    const locationDialog = document.getElementById('locationDialog');
+    const locationSearch = document.getElementById('locationSearch');
+    const locationNote = document.getElementById('locationNote');
+    const locationEmpty = document.getElementById('locationEmpty');
+    const detectButton = document.getElementById('detectLocation');
+
+    function openLocation() {
+        if (!locationDialog || locationDialog.open) return;
+        locationDialog.showModal();
+        if (locationSearch) locationSearch.focus();
+    }
+
+    function filterLocations() {
+        if (!locationSearch) return;
+        const q = locationSearch.value.trim().toLowerCase();
+        let shown = 0;
+        document.querySelectorAll('.loc-place').forEach(function (place) {
+            const hit = !q || (place.getAttribute('data-search') || '').indexOf(q) !== -1;
+            place.hidden = !hit;
+            if (hit) shown += 1;
+        });
+        if (locationEmpty) locationEmpty.hidden = shown > 0;
+    }
+
+    function showLocationNote(message) {
+        if (!locationNote) return;
+        locationNote.hidden = !message;
+        locationNote.textContent = message || '';
+    }
+
     document.addEventListener('click', function (event) {
-        const ask = event.target.closest('[data-need-location]');
-        if (!ask) return;
-        const pin = document.getElementById('deliver-pin');
-        if (pin) pin.focus();
-        toast('Choose a delivery area first.');
+        if (event.target.closest('[data-open-location], [data-need-location]')) {
+            openLocation();
+            if (event.target.closest('[data-need-location]')) {
+                toast('Choose a delivery area first.');
+            }
+            return;
+        }
+        if (event.target.closest('[data-close-location]') && locationDialog) {
+            locationDialog.close();
+        }
     });
 
-    const deliverPin = document.getElementById('deliver-pin');
-    if (deliverPin) {
-        deliverPin.addEventListener('change', function () {
-            if (deliverPin.value && deliverPin.form) deliverPin.form.submit();
+    if (locationDialog) {
+        locationDialog.addEventListener('click', function (event) {
+            if (event.target === locationDialog) locationDialog.close();
+        });
+        const bar = document.querySelector('.deliver-bar.needs-pin');
+        if (bar && !sessionStorage.getItem('loc-asked')) {
+            sessionStorage.setItem('loc-asked', '1');
+            openLocation();
+        }
+    }
+
+    if (locationSearch) {
+        locationSearch.addEventListener('input', function () {
+            showLocationNote('');
+            filterLocations();
+        });
+    }
+
+    if (detectButton) {
+        detectButton.addEventListener('click', function () {
+            showLocationNote('');
+            if (!navigator.geolocation) {
+                showLocationNote('This browser cannot detect location. Search for Pune or Kochi.');
+                return;
+            }
+            detectButton.disabled = true;
+            detectButton.textContent = 'Detecting…';
+            navigator.geolocation.getCurrentPosition(function (pos) {
+                const url = 'https://api.bigdatacloud.net/data/reverse-geocode-client?localityLanguage=en&latitude='
+                    + encodeURIComponent(pos.coords.latitude) + '&longitude=' + encodeURIComponent(pos.coords.longitude);
+                fetch(url).then(function (res) { return res.json(); }).then(function (json) {
+                    const pin = String(json.postcode || '').replace(/\D/g, '').slice(0, 6);
+                    const place = json.locality || json.city || 'that place';
+                    const match = pin ? document.querySelector('.loc-place[value="' + pin + '"]') : null;
+                    if (match) {
+                        match.click();
+                        return;
+                    }
+                    showLocationNote('We don’t deliver to ' + place + (pin ? ' (' + pin + ')' : '') + ' yet. Choose Pune Camp or Kochi Lake.');
+                    detectButton.disabled = false;
+                    detectButton.textContent = 'Detect my location';
+                }).catch(function () {
+                    showLocationNote('Could not read that location. Search for Pune or Kochi.');
+                    detectButton.disabled = false;
+                    detectButton.textContent = 'Detect my location';
+                });
+            }, function () {
+                showLocationNote('Location permission was blocked. Search for an area instead.');
+                detectButton.disabled = false;
+                detectButton.textContent = 'Detect my location';
+            }, { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 });
         });
     }
 

@@ -58,7 +58,7 @@ window.STORE = {
     cartTotal: <?= json_encode(money($cartSummary['total'])) ?>
 };
 </script>
-<script src="<?= e(url('assets/js/app.js?v=3')) ?>"></script>
+<script src="<?= e(url('assets/js/app.js?v=4')) ?>"></script>
 <?php clear_old(); ?>
 </body>
 </html>

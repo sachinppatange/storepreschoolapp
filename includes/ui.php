@@ -84,20 +84,46 @@ function render_delivery_bar(): void
     $areas = delivery_areas();
     $current = current_delivery();
     $pin = (string) ($current['pincode'] ?? '');
+    $label = $current
+        ? $current['store']['city'] . ' · ' . $current['store']['name'] . ' · ' . $pin
+        : 'Choose location';
     ?>
     <div class="deliver-bar<?= $pin === '' ? ' needs-pin' : '' ?>">
-        <form class="wrap" method="post" action="<?= e(url('location.php')) ?>">
-            <?= csrf_field() ?>
-            <input type="hidden" name="return" value="<?= e(current_path()) ?>">
-            <label for="deliver-pin">Deliver to</label>
-            <select id="deliver-pin" name="pincode" required>
-                <option value=""<?= $pin === '' ? ' selected' : '' ?> disabled>Choose an area we deliver to</option>
-                <?php foreach ($areas as $area): ?>
-                    <option value="<?= e($area['pincode']) ?>"<?= $pin === $area['pincode'] ? ' selected' : '' ?>><?= e($area['city']) ?> · <?= e($area['name']) ?> · <?= e($area['pincode']) ?></option>
-                <?php endforeach; ?>
-            </select>
-            <button class="btn btn-green" type="submit">Set</button>
-        </form>
+        <div class="wrap">
+            <button class="deliver-open" type="button" data-open-location>
+                <span>Deliver to</span>
+                <strong><?= e($label) ?></strong>
+            </button>
+        </div>
+        <dialog class="loc-dialog" id="locationDialog">
+            <form method="post" action="<?= e(url('location.php')) ?>">
+                <?= csrf_field() ?>
+                <input type="hidden" name="return" value="<?= e(current_path()) ?>">
+                <div class="loc-head">
+                    <h2>Change location</h2>
+                    <button class="loc-close" type="button" data-close-location aria-label="Close">×</button>
+                </div>
+                <div class="loc-search">
+                    <button class="btn btn-green" id="detectLocation" type="button">Detect my location</button>
+                    <span class="loc-or">or</span>
+                    <input id="locationSearch" type="search" placeholder="Search area or PIN" autocomplete="off" enterkeyhint="search">
+                </div>
+                <p class="loc-note" id="locationNote" hidden></p>
+                <div class="loc-list" id="locationList">
+                    <?php if (!$areas): ?>
+                        <p class="loc-note">Delivery areas are not set up yet.</p>
+                    <?php endif; ?>
+                    <?php foreach ($areas as $area): ?>
+                        <?php $search = strtolower($area['city'] . ' ' . $area['name'] . ' ' . $area['pincode']); ?>
+                        <button class="loc-place<?= $pin === $area['pincode'] ? ' on' : '' ?>" type="submit" name="pincode" value="<?= e($area['pincode']) ?>" data-search="<?= e($search) ?>">
+                            <strong><?= e($area['name']) ?></strong>
+                            <span><?= e($area['city']) ?>, <?= e($area['pincode']) ?></span>
+                        </button>
+                    <?php endforeach; ?>
+                    <p class="loc-empty" id="locationEmpty" hidden>We don’t deliver to that place yet. Pick Pune Camp or Kochi Lake below, or clear the search.</p>
+                </div>
+            </form>
+        </dialog>
     </div>
     <?php
 }
