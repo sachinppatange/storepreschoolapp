@@ -3,7 +3,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/includes/init.php';
 
 $summary = cart_summary();
-if (!$summary['items']) {
+if (!$summary['items'] && empty($summary['prints'])) {
     flash('error', 'Your cart is empty.');
     redirect(url('cart.php'));
 }
@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'Choose a payment method.';
     }
     $summary = cart_summary(true);
-    if (!$summary['items']) {
+    if (!$summary['items'] && empty($summary['prints'])) {
         $errors[] = 'Your cart is empty.';
     }
     foreach ($summary['items'] as $item) {
@@ -128,6 +128,9 @@ require __DIR__ . '/includes/header.php';
             <h2>Your order</h2>
             <?php foreach ($summary['items'] as $item): ?>
                 <p><?= (int) $item['quantity'] ?> × <?= e($item['name']) ?></p>
+            <?php endforeach; ?>
+            <?php foreach ($summary['prints'] ?? [] as $job): ?>
+                <p><?= e(print_label($job)) ?></p>
             <?php endforeach; ?>
             <?php render_totals($summary); ?>
             <div class="coupon-row">

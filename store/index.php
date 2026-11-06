@@ -77,8 +77,12 @@ $pageTitle = $store['name'];
             <article class="job">
                 <h2><?= e($order['order_number']) ?></h2>
                 <p><strong><?= e($order['school_name']) ?></strong><br><?= e($order['address']) ?>, <?= e($order['city']) ?> <?= e($order['pincode']) ?><br><?= e($order['mobile']) ?></p>
+                <?php $prints = print_jobs_for_order((int) $order['id']); ?>
                 <?php foreach (order_items((int) $order['id']) as $item): ?>
                     <p><?= (int) $item['quantity'] ?> × <?= e($item['product_name']) ?></p>
+                <?php endforeach; ?>
+                <?php foreach ($prints as $job): ?>
+                    <p><a href="<?= e(url('print-file.php?job=' . (int) $job['id'])) ?>">Download <?= e($job['original_name']) ?></a></p>
                 <?php endforeach; ?>
                 <p><?= e(str_replace('_', ' ', (string) $order['delivery_status'])) ?> · <?= e($order['payment_method']) ?> · <?= money($order['total']) ?></p>
                 <?php if ($order['notes']): ?><p><?= e($order['notes']) ?></p><?php endif; ?>
@@ -87,7 +91,7 @@ $pageTitle = $store['name'];
                         <?= csrf_field() ?>
                         <input type="hidden" name="action" value="advance">
                         <input type="hidden" name="order_number" value="<?= e($order['order_number']) ?>">
-                        <button class="btn" type="submit"><?= e($step[1]) ?></button>
+                        <button class="btn" type="submit"><?= e($prints && $order['delivery_status'] === 'confirmed' ? 'Print and pack' : $step[1]) ?></button>
                     </form>
                 <?php endif; ?>
             </article>

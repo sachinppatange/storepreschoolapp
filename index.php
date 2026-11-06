@@ -19,7 +19,7 @@ require __DIR__ . '/includes/header.php';
             <p class="lede">Toys, books, art supplies and class kits for Nursery, Jr. KG and Sr. KG. Free delivery on orders of <?= money(FREE_DELIVERY_ABOVE) ?> and above.</p>
             <div class="hero-actions">
                 <a class="btn btn-green" href="<?= e(url('kits.php')) ?>">Shop class kits</a>
-                <a class="btn btn-ghost" href="<?= e(url('category.php')) ?>">Browse categories</a>
+                <a class="btn btn-ghost" href="<?= e(url('print.php')) ?>">Print a file</a>
             </div>
         </div>
         <?php if ($starter): ?>

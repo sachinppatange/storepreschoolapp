@@ -16,6 +16,7 @@ $cartCount = (int) $cartSummary['count'];
             <strong>Shop</strong>
             <a href="<?= e(url('category.php')) ?>">All categories</a>
             <a href="<?= e(url('kits.php')) ?>">Class kits</a>
+            <a href="<?= e(url('print.php')) ?>">Print on demand</a>
             <a href="<?= e(url('bulk-order.php')) ?>">Bulk order for schools</a>
             <a href="<?= e(url('track.php')) ?>">Track an order</a>
         </div>

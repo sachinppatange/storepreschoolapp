@@ -79,6 +79,7 @@ $searchValue = trim((string) ($_GET['q'] ?? ''));
                         <span><?= e($category['emoji']) ?></span><?= e($category['name']) ?>
                     </a>
                 <?php endforeach; ?>
+                <a href="<?= e(url('print.php')) ?>"><span>🖨️</span>Print</a>
                 <a href="<?= e(url('bulk-order.php')) ?>"><span>🏫</span>Bulk order</a>
             </div>
         </nav>

@@ -214,9 +214,13 @@ function cart_summary(bool $refresh = false): array
     }
 
     $items = cart_lines();
+    $prints = print_jobs_open();
     $subtotal = 0.0;
     foreach ($items as $item) {
         $subtotal = round($subtotal + ((float) $item['price'] * (int) $item['quantity']), 2);
+    }
+    foreach ($prints as $job) {
+        $subtotal = round($subtotal + (float) $job['line_total'], 2);
     }
 
     $discount = 0.0;
@@ -234,15 +238,16 @@ function cart_summary(bool $refresh = false): array
     }
 
     $net = round($subtotal - $discount, 2);
-    $delivery = ($items && $net > 0 && $net < FREE_DELIVERY_ABOVE) ? (float) DELIVERY_FEE : 0.0;
+    $delivery = (($items || $prints) && $net > 0 && $net < FREE_DELIVERY_ABOVE) ? (float) DELIVERY_FEE : 0.0;
     $total = round($net + $delivery, 2);
-    $count = 0;
+    $count = count($prints);
     foreach ($items as $item) {
         $count += (int) $item['quantity'];
     }
 
     $cache = [
         'items' => $items,
+        'prints' => $prints,
         'count' => $count,
         'subtotal' => $subtotal,
         'discount' => $discount,
@@ -397,17 +402,16 @@ function merge_cart(int $userId, string $oldSessionId): void
             $claim->execute([$userId, $newSession, (int) $row['id']]);
         }
     }
+    claim_print_jobs($userId, $oldSessionId, $newSession);
     cart_summary(true);
 }
 
 function set_coupon(string $code): array
 {
-    $subtotal = 0.0;
-    foreach (cart_lines() as $line) {
-        $subtotal = round($subtotal + ((float) $line['price'] * (int) $line['quantity']), 2);
-    }
+    $summary = cart_summary();
+    $subtotal = (float) $summary['subtotal'];
     if ($subtotal <= 0) {
-        return ['ok' => false, 'error' => 'Add products before applying a coupon.'];
+        return ['ok' => false, 'error' => 'Add a product or a print before applying a coupon.'];
     }
     $eval = evaluate_coupon($code, $subtotal);
     if (!$eval['ok']) {
@@ -586,13 +590,58 @@ function place_order(array $customer, array $lines, string $method, string $type
     $pdo = db();
     try {
         $pdo->beginTransaction();
-        $priced = price_lines($lines, $couponCode, $type, true);
-        if (!$priced['ok']) {
+        $prints = print_jobs_open(true);
+        $hasProducts = false;
+        foreach ($lines as $line) {
+            if ((int) ($line['id'] ?? 0) > 0 && (int) ($line['qty'] ?? 0) > 0) {
+                $hasProducts = true;
+                break;
+            }
+        }
+        if (!$hasProducts && !$prints) {
             $pdo->rollBack();
-            return $priced;
+            return ['ok' => false, 'error' => 'Add a product or a print before checkout.'];
+        }
+        if ($hasProducts) {
+            $priced = price_lines($lines, null, $type, true);
+            if (!$priced['ok']) {
+                $pdo->rollBack();
+                return $priced;
+            }
+        } else {
+            $priced = [
+                'ok' => true,
+                'items' => [],
+                'subtotal' => 0.0,
+                'discount' => 0.0,
+                'delivery' => 0.0,
+                'total' => 0.0,
+                'coupon' => null,
+            ];
+        }
+        foreach ($prints as $job) {
+            $priced['subtotal'] = round($priced['subtotal'] + (float) $job['line_total'], 2);
+        }
+        $priced['coupon'] = null;
+        $priced['discount'] = 0.0;
+        if ($couponCode) {
+            $eval = evaluate_coupon($couponCode, $priced['subtotal'], true);
+            if (!$eval['ok']) {
+                $pdo->rollBack();
+                return $eval;
+            }
+            $priced['coupon'] = $eval['coupon'];
+            $priced['discount'] = $eval['discount'];
+        }
+        $net = round($priced['subtotal'] - $priced['discount'], 2);
+        $priced['delivery'] = ($net > 0 && $net < FREE_DELIVERY_ABOVE) ? (float) DELIVERY_FEE : 0.0;
+        $priced['total'] = round($net + $priced['delivery'], 2);
+        if ($priced['total'] <= 0) {
+            $pdo->rollBack();
+            return ['ok' => false, 'error' => 'Order total must be greater than zero.'];
         }
         $store = dark_store_for_pincode((string) $customer['pincode']);
-        if ($store) {
+        if ($store && $priced['items']) {
             $short = store_stock_shortfall((int) $store['id'], $priced['items']);
             if ($short) {
                 $pdo->rollBack();
@@ -600,7 +649,7 @@ function place_order(array $customer, array $lines, string $method, string $type
             }
         }
         $number = make_order_number();
-        $deductNow = $method === 'cod' ? 1 : 0;
+        $deductNow = ($method === 'cod' && $priced['items']) ? 1 : 0;
         $stmt = $pdo->prepare('INSERT INTO orders
             (order_number, user_id, order_type, customer_name, email, school_name, mobile, address, city, pincode, notes,
              subtotal, discount, coupon_code, delivery_fee, total, payment_method, payment_status, delivery_status, stock_deducted, dark_store_id)
@@ -633,9 +682,10 @@ function place_order(array $customer, array $lines, string $method, string $type
         foreach ($priced['items'] as $item) {
             $itemStmt->execute([$orderId, $item['id'], $item['name'], $item['price'], $item['qty'], $item['line_total']]);
         }
-        if ($deductNow && !deduct_order_stock($orderId)) {
+        if ($deductNow && $priced['items'] && !deduct_order_stock($orderId)) {
             throw new RuntimeException('Stock changed while placing the order. Please review the cart.');
         }
+        attach_print_jobs($orderId, $prints);
         if ($priced['coupon']) {
             $couponStmt = $pdo->prepare('UPDATE coupons SET used_count = used_count + 1 WHERE id = ? AND (usage_limit IS NULL OR used_count < usage_limit)');
             $couponStmt->execute([(int) $priced['coupon']['id']]);
@@ -646,6 +696,9 @@ function place_order(array $customer, array $lines, string $method, string $type
         $note = $type === 'bulk' ? 'Bulk order placed' : ($method === 'cod' ? 'Cash on delivery order placed' : 'Order placed');
         if ($store) {
             $note .= ' at ' . $store['name'];
+        }
+        if ($prints) {
+            $note .= ' · Print on demand';
         }
         $pdo->prepare('INSERT INTO order_status_logs (order_id, status, note) VALUES (?, ?, ?)')->execute([$orderId, 'placed', $note]);
         $pdo->commit();
@@ -756,7 +809,7 @@ function deduct_order_stock(int $orderId): bool
     $storeStmt = db()->prepare('UPDATE store_stock SET quantity = quantity - ? WHERE dark_store_id = ? AND product_id = ? AND quantity >= ?');
     foreach ($items as $item) {
         if (!$item['product_id']) {
-            return false;
+            continue;
         }
         $qty = (int) $item['quantity'];
         $productId = (int) $item['product_id'];

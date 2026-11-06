@@ -320,3 +320,6 @@ table.data th { font-size: 12px; color: var(--muted); }
     html { scroll-behavior: auto; }
     .toast-msg { transition: none; }
 }
+.print-choice { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.print-choice label { border: 1px solid #e5e7eb; border-radius: 12px; padding: 10px 14px; font-weight: 800; background: #fff; }
+.print-total { font-size: 1.6rem; font-weight: 800; margin: 8px 0; }

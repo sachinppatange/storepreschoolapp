@@ -65,6 +65,9 @@ require __DIR__ . '/includes/header.php';
                 <?php foreach ($items as $item): ?>
                     <p><?= (int) $item['quantity'] ?> × <?= e($item['product_name']) ?> · <?= money($item['line_total']) ?></p>
                 <?php endforeach; ?>
+                <?php foreach (print_jobs_for_order((int) $order['id']) as $job): ?>
+                    <p><a href="<?= e(url('print-file.php?job=' . (int) $job['id'])) ?>">Download <?= e($job['original_name']) ?></a></p>
+                <?php endforeach; ?>
                 <p><strong>Total <?= money($order['total']) ?></strong></p>
             </div>
             <aside class="bill">

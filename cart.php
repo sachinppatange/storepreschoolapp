@@ -11,6 +11,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'remove_coupon') {
         unset($_SESSION['coupon']);
         flash('success', 'Coupon removed.');
+    } elseif ($action === 'remove_print') {
+        $result = print_job_remove((int) ($_POST['print_id'] ?? 0));
+        flash($result['ok'] ? 'success' : 'error', $result['ok'] ? 'Print removed.' : $result['error']);
     } else {
         $result = cart_apply($_POST);
         flash($result['ok'] ? 'success' : 'error', $result['ok'] ? ($result['message'] ?? 'Cart updated') : $result['error']);
@@ -30,12 +33,13 @@ require __DIR__ . '/includes/header.php';
 ?>
 <div class="wrap">
     <div class="page-head"><h1>Your cart</h1></div>
-    <?php if (!$summary['items']): ?>
+    <?php if (!$summary['items'] && empty($summary['prints'])): ?>
         <div class="empty">
             <p class="emoji" style="font-size:42px">🛒</p>
             <h2>Your cart is empty</h2>
-            <p class="muted">Add toys, books or a class kit to get started.</p>
+            <p class="muted">Add toys, books, a class kit, or a file to print.</p>
             <a class="btn btn-green" href="<?= e(url('category.php')) ?>">Browse products</a>
+            <a class="btn btn-ghost" href="<?= e(url('print.php')) ?>">Print a file</a>
         </div>
     <?php else: ?>
         <div class="layout">
@@ -66,6 +70,22 @@ require __DIR__ . '/includes/header.php';
                             </div>
                         </div>
                         <strong><?= money((float) $item['price'] * (int) $item['quantity']) ?></strong>
+                    </div>
+                <?php endforeach; ?>
+                <?php foreach ($summary['prints'] ?? [] as $job): ?>
+                    <div class="cart-line">
+                        <div class="thumb">🖨️</div>
+                        <div>
+                            <strong><?= e(print_label($job)) ?></strong>
+                            <p class="muted small"><?= e($job['original_name']) ?></p>
+                            <form method="post">
+                                <?= csrf_field() ?>
+                                <input type="hidden" name="action" value="remove_print">
+                                <input type="hidden" name="print_id" value="<?= (int) $job['id'] ?>">
+                                <button class="text-btn" type="submit">Remove</button>
+                            </form>
+                        </div>
+                        <strong><?= money($job['line_total']) ?></strong>
                     </div>
                 <?php endforeach; ?>
             </div>
