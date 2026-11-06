@@ -28,7 +28,7 @@ require __DIR__ . '/includes/header.php';
                         <strong><?= e($order['order_number']) ?></strong>
                         <?= status_badge((string) $order['delivery_status']) ?>
                     </div>
-                    <p class="muted small"><?= e(when($order['created_at'])) ?> · <?= e($order['school_name']) ?> · <?= money($order['total']) ?></p>
+                    <p class="muted small"><?= e(when($order['created_at'])) ?> · <?= e(order_place_label($order['school_name'])) ?> · <?= money($order['total']) ?></p>
                     <p class="small">Payment <?= e($order['payment_status']) ?><?= $order['order_type'] === 'bulk' ? ' · Bulk order' : '' ?></p>
                 </a>
             <?php endforeach; ?>

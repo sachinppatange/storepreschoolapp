@@ -56,7 +56,7 @@ require __DIR__ . '/includes/header.php';
 ?>
 <div class="wrap page-narrow">
     <div class="panel pay-box">
-        <p class="muted">Order <?= e($order['order_number']) ?> · <?= e($order['school_name']) ?></p>
+        <p class="muted">Order <?= e($order['order_number']) ?> · <?= e(order_place_label($order['school_name'])) ?></p>
         <p class="amount"><?= money($order['total']) ?></p>
         <p>Pay online for <?= e($order['customer_name']) ?>.</p>
         <?php if ($error): ?><div class="alert-bad"><?= e($error) ?></div><?php endif; ?>

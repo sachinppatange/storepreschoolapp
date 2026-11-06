@@ -15,7 +15,7 @@ require __DIR__ . '/includes/header.php';
 <div class="wrap">
     <div class="page-head">
         <h1>Preschool kits</h1>
-        <p class="muted">Ready packs for a new admission or a whole class. Schools can also <a href="<?= e(url('bulk-order.php')) ?>">place a bulk order</a>.</p>
+        <p class="muted">Parents can buy one kit for a child. Schools can <a href="<?= e(url('bulk-order.php')) ?>">place a bulk order</a> for a class.</p>
     </div>
     <?php foreach ($groups as $type => $label): ?>
         <?php $result = catalog(['kit_type' => $type, 'limit' => 8]); ?>

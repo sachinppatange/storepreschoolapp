@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 $pageTitle = $pageTitle ?? APP_NAME;
-$metaDesc = $metaDesc ?? 'Shop toys, books, stationery, art supplies and class kits for Nursery, Jr. KG and Sr. KG.';
+$metaDesc = $metaDesc ?? 'Parents can order school supplies for kids and have them delivered home. Schools can place a class order too.';
 $simpleHeader = $simpleHeader ?? false;
 $hideDock = $hideDock ?? false;
 $user = current_user();

@@ -10,7 +10,7 @@ $cartCount = (int) $cartSummary['count'];
     <div class="wrap footer-grid">
         <div>
             <strong>Store Preschool</strong>
-            <p>Toys, books, classroom kits and school essentials for Nursery, Jr. KG and Sr. KG.</p>
+            <p>School supplies for kids. Parents order for home. Schools can order for a class.</p>
         </div>
         <div>
             <strong>Shop</strong>

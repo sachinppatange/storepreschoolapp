@@ -457,7 +457,16 @@ function render_setup_screen(string $detail = ''): never
     exit;
 }
 
-function validate_customer_fields(array $post): array
+function order_place_label(?string $school): string
+{
+    $school = trim((string) $school);
+    if ($school === '' || strcasecmp($school, 'Home') === 0) {
+        return 'Home';
+    }
+    return $school;
+}
+
+function validate_customer_fields(array $post, bool $schoolRequired = true): array
 {
     $errors = [];
     $data = [];
@@ -475,10 +484,12 @@ function validate_customer_fields(array $post): array
     $data['email'] = $email;
 
     $school = trim((string) ($post['school_name'] ?? ''));
-    if (mb_strlen($school) < 2 || mb_strlen($school) > 180) {
+    if ($schoolRequired && (mb_strlen($school) < 2 || mb_strlen($school) > 180)) {
         $errors[] = 'Enter the school name.';
+    } elseif ($school !== '' && (mb_strlen($school) < 2 || mb_strlen($school) > 180)) {
+        $errors[] = 'School name looks too short or too long.';
     }
-    $data['school_name'] = $school;
+    $data['school_name'] = $school !== '' ? $school : 'Home';
 
     $phone = normalize_phone((string) ($post['mobile'] ?? ''));
     if (!valid_phone($phone)) {

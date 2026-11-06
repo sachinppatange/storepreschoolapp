@@ -24,7 +24,7 @@ require __DIR__ . '/includes/header.php';
                 <p class="muted"><?= e(when($order['created_at'])) ?></p>
             </div>
         </div>
-        <p><strong><?= e($order['customer_name']) ?></strong><br><?= e($order['school_name']) ?><br><?= e($order['address']) ?><br><?= e($order['city']) ?> <?= e($order['pincode']) ?><br><?= e($order['mobile']) ?> · <?= e($order['email']) ?></p>
+        <p><strong><?= e($order['customer_name']) ?></strong><br><?= e(order_place_label($order['school_name'])) ?><br><?= e($order['address']) ?><br><?= e($order['city']) ?> <?= e($order['pincode']) ?><br><?= e($order['mobile']) ?> · <?= e($order['email']) ?></p>
         <div class="table-wrap">
             <table class="data">
                 <thead><tr><th>Item</th><th>Qty</th><th>Price</th><th>Amount</th></tr></thead>

@@ -74,7 +74,7 @@ require __DIR__ . '/includes/header.php';
                 <h2>Delivery</h2>
                 <?php $servingStore = dark_store_by_id((int) ($order['dark_store_id'] ?? 0)); ?>
                 <?php if ($servingStore): ?><p><strong><?= e($servingStore['name']) ?></strong> is packing and sending this order.</p><?php endif; ?>
-                <p><?= e($order['customer_name']) ?><br><?= e($order['school_name']) ?><br><?= e($order['address']) ?><br><?= e($order['city']) ?> <?= e($order['pincode']) ?><br><?= e($order['mobile']) ?></p>
+                <p><?= e($order['customer_name']) ?><br><?= e(order_place_label($order['school_name'])) ?><br><?= e($order['address']) ?><br><?= e($order['city']) ?> <?= e($order['pincode']) ?><br><?= e($order['mobile']) ?></p>
                 <?php if ($order['payment_method'] === 'razorpay' && $order['payment_status'] === 'pending' && $order['delivery_status'] !== 'cancelled'): ?>
                     <a class="btn btn-green btn-block" href="<?= e(url('pay.php?no=' . rawurlencode($order['order_number']))) ?>">Pay now</a>
                 <?php endif; ?>

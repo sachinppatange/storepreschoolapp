@@ -35,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_POST['city'] = (string) $delivery['store']['city'];
         }
     }
-    [$errors, $data] = validate_customer_fields($_POST);
+    [$errors, $data] = validate_customer_fields($_POST, false);
     if (!$delivery) {
         $errors[] = 'Choose a delivery area at the top before placing the order.';
     }
@@ -110,9 +110,10 @@ require __DIR__ . '/includes/header.php';
         <?= csrf_field() ?>
         <div class="panel">
             <h2>Delivery</h2>
-            <label class="field">Full name<input name="name" required value="<?= e($value('name', (string) ($user['name'] ?? ''))) ?>"></label>
+            <label class="field">Parent name<input name="name" required value="<?= e($value('name', (string) ($user['name'] ?? ''))) ?>"></label>
             <label class="field">Email<input type="email" name="email" required value="<?= e($value('email', (string) ($user['email'] ?? ''))) ?>"></label>
-            <label class="field">School name<input name="school_name" required value="<?= e($value('school_name', (string) ($user['school_name'] ?? ''))) ?>"></label>
+            <label class="field">Child's school <span class="muted">(optional)</span><input name="school_name" value="<?= e($value('school_name', (string) ($user['school_name'] ?? ''))) ?>" placeholder="Leave blank for a home order"></label>
+            <p class="small muted">Order for one child and deliver it home. A school name is only needed on a school bulk order.</p>
             <label class="field">Mobile number<input name="mobile" inputmode="numeric" required value="<?= e($value('mobile', (string) ($user['phone'] ?? ''))) ?>"></label>
             <label class="field">Delivery address<textarea name="address" rows="3" required><?= e($value('address', (string) ($user['address'] ?? ''))) ?></textarea></label>
             <label class="field">City<input name="city" required value="<?= e($value('city', (string) ($delivery['store']['city'] ?? $user['city'] ?? ''))) ?>"></label>
@@ -124,7 +125,7 @@ require __DIR__ . '/includes/header.php';
             <?php endif; ?>
             <label class="field">Notes for delivery<textarea name="notes" rows="2"><?= e($value('notes')) ?></textarea></label>
             <?php if ($user): ?>
-                <label class="check"><input type="checkbox" name="save_address" value="1"> Save this school and address to my account</label>
+                <label class="check"><input type="checkbox" name="save_address" value="1"> Save this address to my account</label>
             <?php else: ?>
                 <p class="small muted"><a href="<?= e(url('login.php?next=' . urlencode(url('checkout.php')))) ?>">Login</a> to save this order in your account.</p>
             <?php endif; ?>

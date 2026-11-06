@@ -18,7 +18,7 @@ require __DIR__ . '/includes/header.php';
     <div class="panel" style="margin-top:16px">
         <p class="eyebrow">Thank you</p>
         <h1>Order <?= e($order['order_number']) ?> is <?= e(str_replace('_', ' ', $order['delivery_status'])) ?></h1>
-        <p>We will deliver to <strong><?= e($order['school_name']) ?></strong>, <?= e($order['address']) ?>, <?= e($order['city']) ?> <?= e($order['pincode']) ?>.</p>
+        <p>We will deliver to <strong><?= e(order_place_label($order['school_name'])) ?></strong>, <?= e($order['address']) ?>, <?= e($order['city']) ?> <?= e($order['pincode']) ?>.</p>
         <p>Payment: <?= status_badge((string) $order['payment_status']) ?> · <?= e($order['payment_method'] === 'cod' ? 'Cash on delivery' : 'Razorpay') ?></p>
         <?php foreach ($items as $item): ?>
             <p><?= (int) $item['quantity'] ?> × <?= e($item['product_name']) ?> · <?= money($item['line_total']) ?></p>

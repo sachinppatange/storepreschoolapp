@@ -16,15 +16,15 @@ if ($slug === '' && $tag === '') {
     ?>
     <div class="wrap">
         <div class="page-head">
-            <h1>Shop by category</h1>
-            <p class="muted">Everything a preschool classroom uses, in one place.</p>
+            <h1>Best school supplies for kids</h1>
+            <p class="muted">Parents can order any of these for one child. The count is the number of items in that category.</p>
         </div>
         <div class="cat-grid">
             <?php foreach ($categories as $item): ?>
                 <a class="cat-tile" href="<?= e(url('category.php?slug=' . rawurlencode($item['slug']))) ?>">
                     <span class="big"><?= e($item['emoji']) ?></span>
                     <strong><?= e($item['name']) ?></strong>
-                    <span class="muted small"><?= (int) $item['product_count'] ?> products</span>
+                    <span class="muted small"><?= (int) $item['product_count'] ?> items</span>
                 </a>
             <?php endforeach; ?>
         </div>
