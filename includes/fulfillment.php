@@ -204,6 +204,119 @@ function dark_store_for_pincode(string $pincode): ?array
     return $row ?: null;
 }
 
+function delivery_areas(): array
+{
+    return db()->query('SELECT p.pincode, s.name, s.city
+        FROM dark_store_pins p
+        JOIN dark_stores s ON s.id = p.dark_store_id
+        WHERE s.is_active = 1
+        ORDER BY s.city, s.name, p.pincode')->fetchAll();
+}
+
+function delivery_pin(): string
+{
+    $pin = preg_replace('/\D/', '', (string) ($_SESSION['deliver_pin'] ?? '')) ?? '';
+    return preg_match('/^\d{6}$/', $pin) ? $pin : '';
+}
+
+function current_delivery(): ?array
+{
+    $pin = delivery_pin();
+    if ($pin === '') {
+        return null;
+    }
+    $store = dark_store_for_pincode($pin);
+    if (!$store) {
+        unset($_SESSION['deliver_pin']);
+        return null;
+    }
+    return ['pincode' => $pin, 'store' => $store];
+}
+
+function remember_delivery_from_user(?array $user): void
+{
+    if ($user === null || current_delivery()) {
+        return;
+    }
+    $pin = preg_replace('/\D/', '', (string) ($user['pincode'] ?? '')) ?? '';
+    if (dark_store_for_pincode($pin)) {
+        $_SESSION['deliver_pin'] = $pin;
+    }
+}
+
+function store_product_qty(int $storeId, int $productId): int
+{
+    $stmt = db()->prepare('SELECT quantity FROM store_stock WHERE dark_store_id = ? AND product_id = ?');
+    $stmt->execute([$storeId, $productId]);
+    return (int) $stmt->fetchColumn();
+}
+
+function overlay_store_stock(array $rows): array
+{
+    $delivery = current_delivery();
+    if (!$delivery || !$rows) {
+        return $rows;
+    }
+    $ids = [];
+    foreach ($rows as $row) {
+        $ids[] = (int) $row['id'];
+    }
+    $ids = array_values(array_unique(array_filter($ids)));
+    if (!$ids) {
+        return $rows;
+    }
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    $stmt = db()->prepare("SELECT product_id, quantity FROM store_stock WHERE dark_store_id = ? AND product_id IN ($placeholders)");
+    $stmt->execute(array_merge([(int) $delivery['store']['id']], $ids));
+    $have = [];
+    foreach ($stmt->fetchAll() as $row) {
+        $have[(int) $row['product_id']] = (int) $row['quantity'];
+    }
+    foreach ($rows as &$row) {
+        $row['stock'] = $have[(int) $row['id']] ?? 0;
+    }
+    unset($row);
+    return $rows;
+}
+
+function trim_cart_for_delivery(): string
+{
+    if (!current_delivery()) {
+        return '';
+    }
+    $changed = false;
+    foreach (cart_lines() as $line) {
+        $have = (int) $line['stock'];
+        $qty = (int) $line['quantity'];
+        if ($qty <= $have) {
+            continue;
+        }
+        $changed = true;
+        if ($have < 1) {
+            db()->prepare('DELETE FROM cart_items WHERE id = ?')->execute([(int) $line['cart_id']]);
+        } else {
+            db()->prepare('UPDATE cart_items SET quantity = ? WHERE id = ?')->execute([$have, (int) $line['cart_id']]);
+        }
+    }
+    if ($changed) {
+        cart_summary(true);
+        return ' Some cart quantities were reduced for this area.';
+    }
+    return '';
+}
+
+function set_delivery_pin(string $raw): array
+{
+    $pin = preg_replace('/\D/', '', $raw) ?? '';
+    $store = dark_store_for_pincode($pin);
+    if (!$store) {
+        return ['ok' => false, 'error' => 'Choose an area we deliver to.'];
+    }
+    $_SESSION['deliver_pin'] = $pin;
+    $note = trim_cart_for_delivery();
+    return ['ok' => true, 'message' => 'Delivering to ' . $store['city'] . ' · ' . $store['name'] . ' (' . $pin . ').' . $note];
+}
+
 function store_pins(int $storeId): array
 {
     $stmt = db()->prepare('SELECT pincode FROM dark_store_pins WHERE dark_store_id = ? ORDER BY pincode');

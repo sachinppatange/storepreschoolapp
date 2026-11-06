@@ -35,11 +35,21 @@ require __DIR__ . '/includes/header.php';
         <p class="price" style="font-size:1.6rem"><?= money($product['price']) ?>
             <?php if ($discount): ?><span class="was"><?= money($product['mrp']) ?></span> <span class="off"><?= $discount ?>% OFF</span><?php endif; ?>
         </p>
-        <p class="stock<?= (int) $product['stock'] <= 0 ? ' out' : '' ?>">
-            <?= (int) $product['stock'] <= 0 ? 'Out of stock' : ((int) $product['stock'] <= 5 ? 'Only ' . (int) $product['stock'] . ' left' : 'In stock · ' . (int) $product['stock'] . ' available') ?>
+        <p class="stock<?= current_delivery() && (int) $product['stock'] <= 0 ? ' out' : '' ?>">
+            <?php if (!current_delivery()): ?>
+                Choose a delivery area to see what this dark store can pack.
+            <?php elseif ((int) $product['stock'] <= 0): ?>
+                Out of stock in this area
+            <?php elseif ((int) $product['stock'] <= 5): ?>
+                Only <?= (int) $product['stock'] ?> left in this area
+            <?php else: ?>
+                In stock here · <?= (int) $product['stock'] ?> available
+            <?php endif; ?>
         </p>
         <p><?= nl2br(e($product['description'])) ?></p>
-        <?php if ($maxQty > 0): ?>
+        <?php if (!current_delivery()): ?>
+            <button class="btn btn-green" type="button" data-need-location>Choose a delivery area</button>
+        <?php elseif ($maxQty > 0): ?>
             <form method="post" action="<?= e(url('cart.php')) ?>" class="qty-row js-cart-form">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="add">

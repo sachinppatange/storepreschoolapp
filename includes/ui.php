@@ -6,7 +6,8 @@ function render_product_card(array $product, int $inCart = 0): void
     $id = (int) $product['id'];
     $discount = discount_percent($product['price'], $product['mrp']);
     $stock = (int) $product['stock'];
-    $soldOut = $stock <= 0;
+    $located = current_delivery() !== null;
+    $soldOut = $located && $stock <= 0;
     $href = url('product.php?slug=' . rawurlencode((string) $product['slug']));
     $return = current_path();
     ?>
@@ -28,6 +29,8 @@ function render_product_card(array $product, int $inCart = 0): void
             <div class="pcard-action">
                 <?php if ($soldOut): ?>
                     <button class="btn-add" type="button" disabled>Sold out</button>
+                <?php elseif (!$located): ?>
+                    <button class="btn-add" type="button" data-need-location>ADD</button>
                 <?php elseif ($inCart > 0): ?>
                     <form method="post" action="<?= e(url('cart.php')) ?>" class="qty-stepper js-cart-form">
                         <?= csrf_field() ?>
@@ -61,16 +64,41 @@ function render_product_card(array $product, int $inCart = 0): void
                 <?php endif; ?>
             </div>
             <p class="stock<?= $soldOut ? ' out' : '' ?>">
-                <?php if ($soldOut): ?>
-                    Out of stock
+                <?php if (!$located): ?>
+                    Choose a delivery area
+                <?php elseif ($soldOut): ?>
+                    Out of stock here
                 <?php elseif ($stock <= 5): ?>
-                    Only <?= $stock ?> left
+                    Only <?= $stock ?> left here
                 <?php else: ?>
-                    In stock
+                    In stock here
                 <?php endif; ?>
             </p>
         </div>
     </article>
+    <?php
+}
+
+function render_delivery_bar(): void
+{
+    $areas = delivery_areas();
+    $current = current_delivery();
+    $pin = (string) ($current['pincode'] ?? '');
+    ?>
+    <div class="deliver-bar<?= $pin === '' ? ' needs-pin' : '' ?>">
+        <form class="wrap" method="post" action="<?= e(url('location.php')) ?>">
+            <?= csrf_field() ?>
+            <input type="hidden" name="return" value="<?= e(current_path()) ?>">
+            <label for="deliver-pin">Deliver to</label>
+            <select id="deliver-pin" name="pincode" required>
+                <option value=""<?= $pin === '' ? ' selected' : '' ?> disabled>Choose an area we deliver to</option>
+                <?php foreach ($areas as $area): ?>
+                    <option value="<?= e($area['pincode']) ?>"<?= $pin === $area['pincode'] ? ' selected' : '' ?>><?= e($area['city']) ?> · <?= e($area['name']) ?> · <?= e($area['pincode']) ?></option>
+                <?php endforeach; ?>
+            </select>
+            <button class="btn btn-green" type="submit">Set</button>
+        </form>
+    </div>
     <?php
 }
 

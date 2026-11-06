@@ -76,6 +76,9 @@ function print_label(array $job): string
 
 function print_add(array $post, array $file): array
 {
+    if (!current_delivery()) {
+        return ['ok' => false, 'error' => 'Choose a delivery area first. That dark store prints the file and delivers it.'];
+    }
     $kind = ($post['kind'] ?? '') === 'photo' ? 'photo' : 'document';
     $color = $kind === 'photo' || !empty($post['color']);
     $pages = $kind === 'photo' ? 1 : (int) ($post['pages'] ?? 0);

@@ -37,7 +37,10 @@ function product_by_slug(string $slug): ?array
         WHERE p.slug = ? AND p.is_active = 1 AND c.is_active = 1 LIMIT 1');
     $stmt->execute([$slug]);
     $row = $stmt->fetch();
-    return $row ?: null;
+    if (!$row) {
+        return null;
+    }
+    return overlay_store_stock([$row])[0];
 }
 
 function catalog(array $opts): array
@@ -108,7 +111,7 @@ function catalog(array $opts): array
     $stmt->execute($params);
 
     return [
-        'items' => $stmt->fetchAll(),
+        'items' => overlay_store_stock($stmt->fetchAll()),
         'total' => $total,
         'page' => $page,
         'pages' => $pages,
@@ -140,7 +143,7 @@ function cart_lines(): array
             WHERE ci.session_id = ? AND ci.user_id IS NULL AND p.is_active = 1 ORDER BY ci.id');
         $stmt->execute([$sessionId]);
     }
-    return $stmt->fetchAll();
+    return overlay_store_stock($stmt->fetchAll());
 }
 
 function cart_line_qty(int $productId): int
@@ -304,7 +307,13 @@ function cart_set(int $productId, int $qty): array
     if (!$product || !(int) $product['is_active']) {
         return ['ok' => false, 'error' => 'This product is unavailable.'];
     }
-    $stock = (int) $product['stock'];
+    if ($qty > 0 && !current_delivery()) {
+        return ['ok' => false, 'error' => 'Choose a delivery area first.', 'need_location' => true];
+    }
+    $delivery = current_delivery();
+    $stock = $delivery
+        ? store_product_qty((int) $delivery['store']['id'], $productId)
+        : (int) $product['stock'];
     if ($qty <= 0) {
         $row = find_cart_row($productId);
         if ($row) {
@@ -641,7 +650,11 @@ function place_order(array $customer, array $lines, string $method, string $type
             return ['ok' => false, 'error' => 'Order total must be greater than zero.'];
         }
         $store = dark_store_for_pincode((string) $customer['pincode']);
-        if ($store && $priced['items']) {
+        if (!$store) {
+            $pdo->rollBack();
+            return ['ok' => false, 'error' => 'We deliver only in the areas shown at the top. Choose one of those PIN codes.'];
+        }
+        if ($priced['items']) {
             $short = store_stock_shortfall((int) $store['id'], $priced['items']);
             if ($short) {
                 $pdo->rollBack();

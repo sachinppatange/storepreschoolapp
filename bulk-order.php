@@ -19,7 +19,7 @@ $customer = [
     'mobile' => (string) ($user['phone'] ?? ''),
     'address' => (string) ($user['address'] ?? ''),
     'city' => (string) ($user['city'] ?? ''),
-    'pincode' => (string) ($user['pincode'] ?? ''),
+    'pincode' => (string) (current_delivery()['pincode'] ?? ''),
     'notes' => '',
 ];
 $qty = [];
@@ -29,9 +29,19 @@ $coupon = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require_csrf();
+    $deliveryNow = current_delivery();
+    if ($deliveryNow) {
+        $_POST['pincode'] = $deliveryNow['pincode'];
+        if (trim((string) ($_POST['city'] ?? '')) === '') {
+            $_POST['city'] = (string) $deliveryNow['store']['city'];
+        }
+    }
     $action = (string) ($_POST['action'] ?? 'review');
     [$fieldErrors, $customer] = validate_customer_fields($_POST);
     $errors = $fieldErrors;
+    if (!$deliveryNow) {
+        $errors[] = 'Choose a delivery area at the top before placing a bulk order.';
+    }
     $method = (string) ($_POST['payment_method'] ?? 'cod');
     if (!in_array($method, ['razorpay', 'cod'], true)) {
         $errors[] = 'Choose how the school will pay.';
@@ -146,10 +156,14 @@ require __DIR__ . '/includes/header.php';
                         <label class="field">School name<input name="school_name" required value="<?= e($customer['school_name']) ?>"></label>
                         <label class="field">Mobile<input name="mobile" required value="<?= e($customer['mobile']) ?>"></label>
                         <label class="field">Delivery address<textarea name="address" rows="3" required><?= e($customer['address']) ?></textarea></label>
-                        <div class="two">
-                            <label class="field">City<input name="city" required value="<?= e($customer['city']) ?>"></label>
-                            <label class="field">PIN code<input name="pincode" required value="<?= e($customer['pincode']) ?>"></label>
-                        </div>
+                        <label class="field">City<input name="city" required value="<?= e($customer['city'] !== '' ? $customer['city'] : (string) (current_delivery()['store']['city'] ?? '')) ?>"></label>
+                        <?php $bulkDelivery = current_delivery(); ?>
+                        <?php if ($bulkDelivery): ?>
+                            <input type="hidden" name="pincode" value="<?= e($bulkDelivery['pincode']) ?>">
+                            <p class="small"><?= e($bulkDelivery['store']['name']) ?> packs this order for PIN <?= e($bulkDelivery['pincode']) ?>.</p>
+                        <?php else: ?>
+                            <p class="alert-warn">Choose a delivery area in the bar above before adding quantities.</p>
+                        <?php endif; ?>
                         <div class="two">
                             <label class="field">Nursery students<input type="number" min="0" name="nursery_count" value="<?= (int) $counts['nursery'] ?>"></label>
                             <label class="field">Jr. KG students<input type="number" min="0" name="jr_count" value="<?= (int) $counts['jr'] ?>"></label>

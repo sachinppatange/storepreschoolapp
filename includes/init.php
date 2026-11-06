@@ -57,6 +57,7 @@ try {
     db()->query('SELECT 1 FROM users LIMIT 1');
     ensure_fulfillment_schema();
     ensure_print_schema();
+    remember_delivery_from_user(current_user());
 } catch (Throwable $e) {
     render_setup_screen($e->getMessage());
 }

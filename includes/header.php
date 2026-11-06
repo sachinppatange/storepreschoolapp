@@ -24,7 +24,7 @@ $searchValue = trim((string) ($_GET['q'] ?? ''));
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="<?= e(url('assets/css/style.css')) ?>" rel="stylesheet">
+    <link href="<?= e(url('assets/css/style.css?v=3')) ?>" rel="stylesheet">
 </head>
 <body class="<?= $cartCount > 0 && !$hideDock ? 'has-dock' : '' ?>">
 <a class="skip" href="#main">Skip to content</a>
@@ -38,10 +38,6 @@ $searchValue = trim((string) ($_GET['q'] ?? ''));
             </span>
         </a>
         <?php if (!$simpleHeader): ?>
-            <div class="loc">
-                <span>Deliver to</span>
-                <strong><?= e($user['school_name'] ?? 'Your school') ?></strong>
-            </div>
             <form class="search" action="<?= e(url('search.php')) ?>" method="get" role="search">
                 <label class="sr-only" for="q">Search products</label>
                 <input id="q" name="q" value="<?= e($searchValue) ?>" placeholder="Search for toys, books, kits..." autocomplete="off">
@@ -84,6 +80,7 @@ $searchValue = trim((string) ($_GET['q'] ?? ''));
             </div>
         </nav>
     <?php endif; ?>
+    <?php render_delivery_bar(); ?>
 </header>
 <?php if ($message = flash('success')): ?>
     <div class="wrap"><div class="alert-ok"><?= e($message) ?></div></div>

@@ -28,7 +28,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect(url('checkout.php'));
     }
 
+    $delivery = current_delivery();
+    if ($delivery) {
+        $_POST['pincode'] = $delivery['pincode'];
+        if (trim((string) ($_POST['city'] ?? '')) === '') {
+            $_POST['city'] = (string) $delivery['store']['city'];
+        }
+    }
     [$errors, $data] = validate_customer_fields($_POST);
+    if (!$delivery) {
+        $errors[] = 'Choose a delivery area at the top before placing the order.';
+    }
     $method = (string) ($_POST['payment_method'] ?? '');
     if (!in_array($method, ['razorpay', 'cod'], true)) {
         $errors[] = 'Choose a payment method.';
@@ -83,6 +93,7 @@ $hideDock = true;
 $pageTitle = 'Checkout';
 $summary = cart_summary();
 $coupons = active_coupons();
+$delivery = current_delivery();
 $value = static function (string $key, string $fallback = '') use ($user): string {
     if (isset($_SESSION['old'][$key])) {
         return (string) $_SESSION['old'][$key];
@@ -104,15 +115,13 @@ require __DIR__ . '/includes/header.php';
             <label class="field">School name<input name="school_name" required value="<?= e($value('school_name', (string) ($user['school_name'] ?? ''))) ?>"></label>
             <label class="field">Mobile number<input name="mobile" inputmode="numeric" required value="<?= e($value('mobile', (string) ($user['phone'] ?? ''))) ?>"></label>
             <label class="field">Delivery address<textarea name="address" rows="3" required><?= e($value('address', (string) ($user['address'] ?? ''))) ?></textarea></label>
-            <div class="two">
-                <label class="field">City<input name="city" required value="<?= e($value('city', (string) ($user['city'] ?? ''))) ?>"></label>
-                <label class="field">PIN code<input name="pincode" inputmode="numeric" required value="<?= e($value('pincode', (string) ($user['pincode'] ?? ''))) ?>"></label>
-                <?php
-                $pinPreview = preg_replace('/\D/', '', (string) $value('pincode', (string) ($user['pincode'] ?? ''))) ?? '';
-                $serving = dark_store_for_pincode($pinPreview);
-                ?>
-                <p class="small muted"><?= $serving ? e($serving['name']) . ' will pack this order.' : 'A dark store is assigned when this PIN is covered. Other PINs stay with the shop until a store is chosen.' ?></p>
-            </div>
+            <label class="field">City<input name="city" required value="<?= e($value('city', (string) ($delivery['store']['city'] ?? $user['city'] ?? ''))) ?>"></label>
+            <?php if ($delivery): ?>
+                <input type="hidden" name="pincode" value="<?= e($delivery['pincode']) ?>">
+                <p class="small"><?= e($delivery['store']['name']) ?> packs this order for PIN <?= e($delivery['pincode']) ?>. Change the area in the bar above.</p>
+            <?php else: ?>
+                <p class="alert-warn">Choose a delivery area in the bar above. Checkout uses only those PIN codes.</p>
+            <?php endif; ?>
             <label class="field">Notes for delivery<textarea name="notes" rows="2"><?= e($value('notes')) ?></textarea></label>
             <?php if ($user): ?>
                 <label class="check"><input type="checkbox" name="save_address" value="1"> Save this school and address to my account</label>
@@ -145,7 +154,7 @@ require __DIR__ . '/includes/header.php';
             <?php if (!empty($_SESSION['coupon'])): ?>
                 <button class="text-btn" type="submit" name="action" value="remove_coupon">Remove coupon</button>
             <?php endif; ?>
-            <button class="btn btn-green btn-block" type="submit" name="action" value="place">Place order</button>
+            <button class="btn btn-green btn-block" type="submit" name="action" value="place"<?= $delivery ? '' : ' disabled' ?>>Place order</button>
         </aside>
     </form>
 </div>

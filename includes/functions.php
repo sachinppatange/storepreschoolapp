@@ -295,6 +295,10 @@ function attempt_login(string $email, string $password, bool $adminOnly = false)
     if (function_exists('merge_cart')) {
         merge_cart((int) $user['id'], $oldSession);
     }
+    if (function_exists('remember_delivery_from_user')) {
+        remember_delivery_from_user($user);
+        trim_cart_for_delivery();
+    }
     return ['ok' => true, 'user' => $user];
 }
 

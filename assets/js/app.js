@@ -81,6 +81,10 @@
             }).then(function (res) { return res.json(); }).then(function (json) {
                 if (!json.ok) {
                     toast(json.error || 'Could not update the cart');
+                    if (json.need_location) {
+                        const pin = document.getElementById('deliver-pin');
+                        if (pin) pin.focus();
+                    }
                     return;
                 }
                 if (json.product_id) paintCards(json.product_id, json.line_qty || 0);
@@ -150,6 +154,21 @@
         });
         document.addEventListener('click', function (event) {
             if (!event.target.closest('.search')) box.hidden = true;
+        });
+    }
+
+    document.addEventListener('click', function (event) {
+        const ask = event.target.closest('[data-need-location]');
+        if (!ask) return;
+        const pin = document.getElementById('deliver-pin');
+        if (pin) pin.focus();
+        toast('Choose a delivery area first.');
+    });
+
+    const deliverPin = document.getElementById('deliver-pin');
+    if (deliverPin) {
+        deliverPin.addEventListener('change', function () {
+            if (deliverPin.value && deliverPin.form) deliverPin.form.submit();
         });
     }
 
