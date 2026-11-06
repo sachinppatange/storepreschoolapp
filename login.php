@@ -13,7 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $result = attempt_login((string) ($_POST['email'] ?? ''), (string) ($_POST['password'] ?? ''));
     if ($result['ok']) {
         $user = $result['user'];
-        if (in_array($user['role'], ['admin', 'vendor', 'store'], true) && ($next === url('account.php') || $next === url())) {
+        if (in_array($user['role'], ['admin', 'vendor', 'store', 'school'], true) && ($next === url('account.php') || $next === url())) {
             $next = role_home($user);
         }
         redirect($next);
@@ -34,7 +34,8 @@ require __DIR__ . '/includes/header.php';
                 <strong>Demo parent</strong><br>parent@example.com · Parent@123<br>
                 <strong>Demo admin</strong><br>admin@storepreschoolapp.in · Admin@123<br>
                 <strong>Vendor</strong><br>vendor@storepreschoolapp.in · Vendor@123<br>
-                <strong>Dark store</strong><br>store@storepreschoolapp.in · Store@123
+                <strong>Dark store</strong><br>store@storepreschoolapp.in · Store@123<br>
+                <strong>School (B2B)</strong><br>school@storepreschoolapp.in · School@123
             </div>
         <?php endif; ?>
         <?php if ($error): ?><div class="alert-bad"><?= e($error) ?></div><?php endif; ?>

@@ -13,6 +13,10 @@ function ensure_fulfillment_schema(): void
     $role = $pdo->query("SHOW COLUMNS FROM users LIKE 'role'")->fetch();
     if ($role && !str_contains((string) $role['Type'], 'vendor')) {
         $pdo->exec("ALTER TABLE users MODIFY role ENUM('customer','admin','vendor','store') NOT NULL DEFAULT 'customer'");
+        $role = $pdo->query("SHOW COLUMNS FROM users LIKE 'role'")->fetch();
+    }
+    if ($role && !str_contains((string) $role['Type'], "'school'")) {
+        $pdo->exec("ALTER TABLE users MODIFY role ENUM('customer','admin','vendor','store','school') NOT NULL DEFAULT 'customer'");
     }
     fulfillment_add_column('users', 'vendor_id', 'INT UNSIGNED NULL');
     fulfillment_add_column('users', 'dark_store_id', 'INT UNSIGNED NULL');
@@ -69,6 +73,7 @@ function ensure_fulfillment_schema(): void
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
     seed_fulfillment();
+    seed_school_account();
 }
 
 function fulfillment_add_column(string $table, string $column, string $definition): void
@@ -147,12 +152,67 @@ function fulfillment_staff(int $unused, string $name, string $email, string $pho
         ]);
 }
 
+function seed_school_account(): void
+{
+    $email = 'school@storepreschoolapp.in';
+    $stmt = db()->prepare('SELECT id FROM users WHERE email = ? LIMIT 1');
+    $stmt->execute([$email]);
+    if ($stmt->fetch()) {
+        return;
+    }
+    db()->prepare('INSERT INTO users (name, email, phone, password_hash, role, school_name, city) VALUES (?, ?, ?, ?, ?, ?, ?)')
+        ->execute([
+            'Little Stars Preschool',
+            $email,
+            '9800000001',
+            password_hash('School@123', PASSWORD_DEFAULT),
+            'school',
+            'Little Stars Preschool',
+            'Pune',
+        ]);
+}
+
+function school_b2b_percent(): int
+{
+    $percent = defined('SCHOOL_B2B_PERCENT') ? (int) SCHOOL_B2B_PERCENT : 15;
+    return max(0, min(50, $percent));
+}
+
+function is_school_buyer(): bool
+{
+    $user = current_user();
+    return $user !== null && ($user['role'] ?? '') === 'school';
+}
+
+function b2b_unit_price(float $price): float
+{
+    if (!is_school_buyer()) {
+        return round($price, 2);
+    }
+    return round($price * (100 - school_b2b_percent()) / 100, 2);
+}
+
+function apply_b2b_prices(array $rows): array
+{
+    if (!is_school_buyer() || !$rows) {
+        return $rows;
+    }
+    foreach ($rows as &$row) {
+        if (isset($row['price'])) {
+            $row['price'] = b2b_unit_price((float) $row['price']);
+        }
+    }
+    unset($row);
+    return $rows;
+}
+
 function role_home(array $user): string
 {
     return match ($user['role'] ?? '') {
         'admin' => url('admin/index.php'),
         'vendor' => url('vendor/index.php'),
         'store' => url('store/index.php'),
+        'school' => url('bulk-order.php'),
         default => url('account.php'),
     };
 }

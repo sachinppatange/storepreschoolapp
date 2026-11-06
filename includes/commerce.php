@@ -40,7 +40,7 @@ function product_by_slug(string $slug): ?array
     if (!$row) {
         return null;
     }
-    return overlay_store_stock([$row])[0];
+    return apply_b2b_prices(overlay_store_stock([$row]))[0];
 }
 
 function catalog(array $opts): array
@@ -111,7 +111,7 @@ function catalog(array $opts): array
     $stmt->execute($params);
 
     return [
-        'items' => overlay_store_stock($stmt->fetchAll()),
+        'items' => apply_b2b_prices(overlay_store_stock($stmt->fetchAll())),
         'total' => $total,
         'page' => $page,
         'pages' => $pages,
@@ -143,7 +143,7 @@ function cart_lines(): array
             WHERE ci.session_id = ? AND ci.user_id IS NULL AND p.is_active = 1 ORDER BY ci.id');
         $stmt->execute([$sessionId]);
     }
-    return overlay_store_stock($stmt->fetchAll());
+    return apply_b2b_prices(overlay_store_stock($stmt->fetchAll()));
 }
 
 function cart_line_qty(int $productId): int
@@ -534,7 +534,7 @@ function price_lines(array $lines, ?string $couponCode, string $type, bool $lock
         if ((int) $product['stock'] < $qty) {
             return ['ok' => false, 'error' => $product['name'] . ' has only ' . (int) $product['stock'] . ' left.'];
         }
-        $price = round((float) $product['price'], 2);
+        $price = b2b_unit_price((float) $product['price']);
         $lineTotal = round($price * $qty, 2);
         $subtotal = round($subtotal + $lineTotal, 2);
         $items[] = [

@@ -12,6 +12,7 @@ $links = [
     'stores' => ['Dark stores', 'dark-stores.php'],
     'vendors' => ['Vendors', 'vendors.php'],
     'customers' => ['Customers', 'customers.php'],
+    'schools' => ['Schools', 'schools.php'],
     'coupons' => ['Coupons', 'coupons.php'],
     'messages' => ['Messages' . ($unreadMessages ? ' (' . $unreadMessages . ')' : ''), 'messages.php'],
     'reports' => ['Reports', 'reports.php'],

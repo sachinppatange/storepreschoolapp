@@ -32,6 +32,7 @@ require __DIR__ . '/includes/header.php';
         <p class="muted"><a href="<?= e(url('category.php?slug=' . rawurlencode($product['category_slug']))) ?>"><?= e($product['category_name']) ?></a> · <?= e($product['unit_label']) ?></p>
         <h1><?= e($product['name']) ?></h1>
         <p class="lede"><?= e($product['short_desc']) ?></p>
+        <?php if (is_school_buyer()): ?><p class="small" style="color:#0c831f;font-weight:800">School price · <?= (int) school_b2b_percent() ?>% off the parent price</p><?php endif; ?>
         <p class="price" style="font-size:1.6rem"><?= money($product['price']) ?>
             <?php if ($discount): ?><span class="was"><?= money($product['mrp']) ?></span> <span class="off"><?= $discount ?>% OFF</span><?php endif; ?>
         </p>

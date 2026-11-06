@@ -106,7 +106,11 @@ require __DIR__ . '/includes/header.php';
 <div class="wrap">
     <div class="page-head">
         <h1>Bulk order for schools</h1>
-        <p class="muted">Order kits and supplies for a class. You will see the total before the order is placed. Use code SCHOOL15 on orders of <?= money(1999) ?> or more.</p>
+        <?php if (is_school_buyer()): ?>
+            <p class="muted">You are ordering as <strong><?= e((string) current_user()['school_name']) ?></strong>. Every price is the school price, <?= (int) school_b2b_percent() ?>% below the parent price. No coupon is required for that discount.</p>
+        <?php else: ?>
+            <p class="muted">Parents pay the regular price here. A school login sees B2B prices and can order a class in one go. <a href="<?= e(url('login.php?next=' . urlencode(url('bulk-order.php')))) ?>">School login</a></p>
+        <?php endif; ?>
     </div>
     <?php if ($errors): ?><ul class="errors"><?php foreach ($errors as $error): ?><li><?= e($error) ?></li><?php endforeach; ?></ul><?php endif; ?>
 

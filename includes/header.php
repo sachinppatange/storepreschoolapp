@@ -54,6 +54,7 @@ $searchValue = trim((string) ($_GET['q'] ?? ''));
                         'admin' => 'Admin',
                         'vendor' => 'Vendor',
                         'store' => 'Dark store',
+                        'school' => 'School',
                         default => strtok($user['name'], ' ') ?: 'Account',
                     }) ?>
                 </a>

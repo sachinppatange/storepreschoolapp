@@ -63,6 +63,7 @@ function render_product_card(array $product, int $inCart = 0): void
                     <span class="off"><?= $discount ?>% OFF</span>
                 <?php endif; ?>
             </div>
+            <?php if (is_school_buyer()): ?><p class="small" style="color:#0c831f;font-weight:800">School price · <?= (int) school_b2b_percent() ?>% off</p><?php endif; ?>
             <p class="stock<?= $soldOut ? ' out' : '' ?>">
                 <?php if (!$located): ?>
                     Choose a delivery area
