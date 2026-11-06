@@ -243,6 +243,12 @@ function cart_summary(bool $refresh = false): array
     $net = round($subtotal - $discount, 2);
     $delivery = (($items || $prints) && $net > 0 && $net < FREE_DELIVERY_ABOVE) ? (float) DELIVERY_FEE : 0.0;
     $total = round($net + $delivery, 2);
+    $preview = attach_referral_preview([
+        'ok' => true,
+        'total' => $total,
+    ]);
+    $total = (float) $preview['total'];
+    $referralSpent = (float) $preview['referral_spent'];
     $count = count($prints);
     foreach ($items as $item) {
         $count += (int) $item['quantity'];
@@ -258,6 +264,7 @@ function cart_summary(bool $refresh = false): array
         'coupon_error' => $couponError,
         'delivery' => $delivery,
         'total' => $total,
+        'referral_spent' => $referralSpent,
     ];
     return $cache;
 }
@@ -645,7 +652,9 @@ function place_order(array $customer, array $lines, string $method, string $type
         $net = round($priced['subtotal'] - $priced['discount'], 2);
         $priced['delivery'] = ($net > 0 && $net < FREE_DELIVERY_ABOVE) ? (float) DELIVERY_FEE : 0.0;
         $priced['total'] = round($net + $priced['delivery'], 2);
-        if ($priced['total'] <= 0) {
+        $referral = lock_referral_for_order($priced, (string) $customer['email']);
+        $priced['total'] = round($priced['total'] - $referral['spent'], 2);
+        if ($priced['total'] < 0 || ($priced['total'] <= 0 && $referral['spent'] <= 0)) {
             $pdo->rollBack();
             return ['ok' => false, 'error' => 'Order total must be greater than zero.'];
         }
@@ -662,11 +671,13 @@ function place_order(array $customer, array $lines, string $method, string $type
             }
         }
         $number = make_order_number();
-        $deductNow = ($method === 'cod' && $priced['items']) ? 1 : 0;
+        $paymentStatus = $priced['total'] <= 0 ? 'paid' : 'pending';
+        $deductNow = ($priced['items'] && ($method === 'cod' || $paymentStatus === 'paid')) ? 1 : 0;
         $stmt = $pdo->prepare('INSERT INTO orders
             (order_number, user_id, order_type, customer_name, email, school_name, mobile, address, city, pincode, notes,
-             subtotal, discount, coupon_code, delivery_fee, total, payment_method, payment_status, delivery_status, stock_deducted, dark_store_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+             subtotal, discount, coupon_code, delivery_fee, total, payment_method, payment_status, delivery_status, stock_deducted, dark_store_id,
+             referral_school_id, referral_earn, referral_spent)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
         $stmt->execute([
             $number,
             $customer['user_id'],
@@ -685,10 +696,13 @@ function place_order(array $customer, array $lines, string $method, string $type
             $priced['delivery'],
             $priced['total'],
             $method,
-            'pending',
+            $paymentStatus,
             'placed',
             $deductNow,
             $store['id'] ?? null,
+            $referral['school_id'],
+            $referral['earn'],
+            $referral['spent'],
         ]);
         $orderId = (int) $pdo->lastInsertId();
         $itemStmt = $pdo->prepare('INSERT INTO order_items (order_id, product_id, product_name, unit_price, quantity, line_total) VALUES (?, ?, ?, ?, ?, ?)');
@@ -713,6 +727,12 @@ function place_order(array $customer, array $lines, string $method, string $type
         if ($prints) {
             $note .= ' · Print on demand';
         }
+        if ($referral['earn'] > 0) {
+            $note .= ' · School referral ' . money($referral['earn']);
+        }
+        if ($referral['spent'] > 0) {
+            $note .= ' · Referral balance ' . money($referral['spent']);
+        }
         $pdo->prepare('INSERT INTO order_status_logs (order_id, status, note) VALUES (?, ?, ?)')->execute([$orderId, 'placed', $note]);
         $pdo->commit();
     } catch (Throwable $e) {
@@ -727,7 +747,7 @@ function place_order(array $customer, array $lines, string $method, string $type
     }
 
     $order = find_order_by_id($orderId);
-    if ($order && $method === 'razorpay' && razorpay_ready()) {
+    if ($order && $method === 'razorpay' && razorpay_ready() && (float) $order['total'] > 0) {
         $created = razorpay_create_for_order($order);
         if (!$created['ok']) {
             $order['razorpay_error'] = $created['error'];
@@ -885,6 +905,7 @@ function change_order_state(array $order, string $paymentStatus, string $deliver
         if ($deliveryStatus === 'cancelled' && $current['delivery_status'] !== 'cancelled') {
             release_coupon($current['coupon_code'] ?: null);
         }
+        reverse_referral($current, $paymentStatus, $deliveryStatus);
 
         $pdo->prepare('UPDATE orders SET payment_status = ?, delivery_status = ?, stock_deducted = ? WHERE id = ?')
             ->execute([$paymentStatus, $deliveryStatus, $deducted ? 1 : 0, (int) $current['id']]);

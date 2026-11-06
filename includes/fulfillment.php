@@ -20,8 +20,19 @@ function ensure_fulfillment_schema(): void
     }
     fulfillment_add_column('users', 'vendor_id', 'INT UNSIGNED NULL');
     fulfillment_add_column('users', 'dark_store_id', 'INT UNSIGNED NULL');
+    fulfillment_add_column('users', 'referral_code', 'VARCHAR(16) NULL');
+    fulfillment_add_column('users', 'referral_balance', 'DECIMAL(10,2) NOT NULL DEFAULT 0');
     fulfillment_add_column('products', 'vendor_id', 'INT UNSIGNED NULL');
     fulfillment_add_column('orders', 'dark_store_id', 'INT UNSIGNED NULL');
+    fulfillment_add_column('orders', 'referral_school_id', 'INT UNSIGNED NULL');
+    fulfillment_add_column('orders', 'referral_earn', 'DECIMAL(10,2) NOT NULL DEFAULT 0');
+    fulfillment_add_column('orders', 'referral_spent', 'DECIMAL(10,2) NOT NULL DEFAULT 0');
+    fulfillment_add_column('orders', 'referral_void', 'TINYINT(1) NOT NULL DEFAULT 0');
+    $index = $pdo->prepare('SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?');
+    $index->execute(['users', 'uniq_referral_code']);
+    if ((int) $index->fetchColumn() === 0) {
+        $pdo->exec('ALTER TABLE users ADD UNIQUE KEY uniq_referral_code (referral_code)');
+    }
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS vendors (
         id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -74,6 +85,7 @@ function ensure_fulfillment_schema(): void
 
     seed_fulfillment();
     seed_school_account();
+    assign_missing_referral_codes();
 }
 
 function fulfillment_add_column(string $table, string $column, string $definition): void
@@ -170,6 +182,189 @@ function seed_school_account(): void
             'Little Stars Preschool',
             'Pune',
         ]);
+}
+
+function school_referral_percent(): int
+{
+    $percent = defined('SCHOOL_REFERRAL_PERCENT') ? (int) SCHOOL_REFERRAL_PERCENT : 5;
+    return max(0, min(20, $percent));
+}
+
+function make_referral_code(int $userId, string $label): string
+{
+    $base = strtoupper((string) preg_replace('/[^A-Za-z0-9]/', '', $label));
+    $base = substr($base, 0, 12);
+    if (strlen($base) < 4) {
+        $base = 'SCHOOL' . $userId;
+    }
+    $code = $base;
+    $try = 1;
+    $stmt = db()->prepare('SELECT id FROM users WHERE referral_code = ? AND id <> ? LIMIT 1');
+    while ($try < 100) {
+        $stmt->execute([$code, $userId]);
+        if (!$stmt->fetch()) {
+            return $code;
+        }
+        $try++;
+        $code = substr($base, 0, 10) . $try;
+    }
+    return 'S' . $userId;
+}
+
+function assign_missing_referral_codes(): void
+{
+    $rows = db()->query("SELECT id, school_name, name FROM users WHERE role = 'school' AND (referral_code IS NULL OR referral_code = '')")->fetchAll();
+    $update = db()->prepare('UPDATE users SET referral_code = ? WHERE id = ?');
+    foreach ($rows as $row) {
+        $label = trim((string) $row['school_name']) !== '' ? (string) $row['school_name'] : (string) $row['name'];
+        $update->execute([make_referral_code((int) $row['id'], $label), (int) $row['id']]);
+    }
+}
+
+function school_by_referral(string $code): ?array
+{
+    $code = strtoupper((string) preg_replace('/[^A-Za-z0-9]/', '', $code));
+    if ($code === '' || strlen($code) > 16) {
+        return null;
+    }
+    $stmt = db()->prepare("SELECT id, name, email, school_name, referral_code FROM users WHERE referral_code = ? AND role = 'school' AND is_active = 1 LIMIT 1");
+    $stmt->execute([$code]);
+    $row = $stmt->fetch();
+    return $row ?: null;
+}
+
+function referral_share_url(string $code): string
+{
+    $https = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
+    $host = (string) ($_SERVER['HTTP_HOST'] ?? 'store.preschoolapp.in');
+    return ($https ? 'https://' : 'http://') . $host . url('index.php?ref=' . rawurlencode($code));
+}
+
+function remember_referral(): void
+{
+    $fromGet = array_key_exists('ref', $_GET);
+    if (!$fromGet && !empty($_SESSION['referral_school_id'])) {
+        return;
+    }
+    $raw = $fromGet ? (string) $_GET['ref'] : (string) ($_COOKIE['sp_ref'] ?? '');
+    $school = school_by_referral($raw);
+    if (!$school) {
+        return;
+    }
+    $user = current_user();
+    if ($user && (int) $user['id'] === (int) $school['id']) {
+        return;
+    }
+    $_SESSION['referral_school_id'] = (int) $school['id'];
+    $_SESSION['referral_school_name'] = (string) ($school['school_name'] !== '' ? $school['school_name'] : $school['name']);
+    $_SESSION['referral_code'] = (string) $school['referral_code'];
+    if ($fromGet && !headers_sent()) {
+        setcookie('sp_ref', (string) $school['referral_code'], [
+            'expires' => time() + 60 * 60 * 24 * 30,
+            'path' => '/',
+            'httponly' => true,
+            'samesite' => 'Lax',
+            'secure' => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+        ]);
+    }
+}
+
+function current_referral(): ?array
+{
+    $id = (int) ($_SESSION['referral_school_id'] ?? 0);
+    if ($id <= 0) {
+        return null;
+    }
+    $user = current_user();
+    if ($user && ((int) $user['id'] === $id || ($user['role'] ?? '') === 'school')) {
+        return null;
+    }
+    return [
+        'id' => $id,
+        'school_name' => (string) ($_SESSION['referral_school_name'] ?? 'the school'),
+        'code' => (string) ($_SESSION['referral_code'] ?? ''),
+    ];
+}
+
+function referral_balance_of(int $userId, bool $lock = false): float
+{
+    $sql = 'SELECT referral_balance FROM users WHERE id = ? LIMIT 1' . ($lock ? ' FOR UPDATE' : '');
+    $stmt = db()->prepare($sql);
+    $stmt->execute([$userId]);
+    return round(max(0, (float) $stmt->fetchColumn()), 2);
+}
+
+function attach_referral_preview(array $priced): array
+{
+    $spent = 0.0;
+    $user = current_user();
+    if ($user && ($user['role'] ?? '') === 'school' && ($priced['ok'] ?? false) !== false && isset($priced['total'])) {
+        $balance = round(max(0, (float) ($user['referral_balance'] ?? 0)), 2);
+        $spent = round(min($balance, (float) $priced['total']), 2);
+        $priced['total'] = round((float) $priced['total'] - $spent, 2);
+    }
+    $priced['referral_spent'] = $spent;
+    return $priced;
+}
+
+function lock_referral_for_order(array $priced, string $buyerEmail): array
+{
+    $empty = ['spent' => 0.0, 'earn' => 0.0, 'school_id' => null];
+    $user = current_user();
+    if ($user && ($user['role'] ?? '') === 'school') {
+        $stmt = db()->prepare('SELECT referral_balance FROM users WHERE id = ? AND role = ? FOR UPDATE');
+        $stmt->execute([(int) $user['id'], 'school']);
+        $balance = round(max(0, (float) $stmt->fetchColumn()), 2);
+        $spent = round(min($balance, (float) $priced['total']), 2);
+        if ($spent <= 0) {
+            return $empty;
+        }
+        $update = db()->prepare('UPDATE users SET referral_balance = referral_balance - ? WHERE id = ? AND referral_balance >= ?');
+        $update->execute([$spent, (int) $user['id'], $spent]);
+        if ($update->rowCount() !== 1) {
+            return $empty;
+        }
+        return ['spent' => $spent, 'earn' => 0.0, 'school_id' => null];
+    }
+
+    $ref = current_referral();
+    if (!$ref || school_referral_percent() <= 0) {
+        return $empty;
+    }
+    $school = db()->prepare("SELECT id, email FROM users WHERE id = ? AND role = 'school' AND is_active = 1 FOR UPDATE");
+    $school->execute([(int) $ref['id']]);
+    $row = $school->fetch();
+    if (!$row || strtolower((string) $row['email']) === strtolower(trim($buyerEmail))) {
+        return $empty;
+    }
+    $base = round(max(0, (float) $priced['subtotal'] - (float) $priced['discount']), 2);
+    $earn = round($base * school_referral_percent() / 100, 2);
+    if ($earn <= 0) {
+        return $empty;
+    }
+    db()->prepare('UPDATE users SET referral_balance = referral_balance + ? WHERE id = ?')->execute([$earn, (int) $row['id']]);
+    return ['spent' => 0.0, 'earn' => $earn, 'school_id' => (int) $row['id']];
+}
+
+function reverse_referral(array $current, string $paymentStatus, string $deliveryStatus): void
+{
+    $dead = $deliveryStatus === 'cancelled' || in_array($paymentStatus, ['failed', 'refunded'], true);
+    if (!$dead || (int) ($current['referral_void'] ?? 0) === 1) {
+        return;
+    }
+    $earn = round((float) ($current['referral_earn'] ?? 0), 2);
+    $spent = round((float) ($current['referral_spent'] ?? 0), 2);
+    $schoolId = (int) ($current['referral_school_id'] ?? 0);
+    if ($earn > 0 && $schoolId > 0) {
+        db()->prepare('UPDATE users SET referral_balance = referral_balance - ? WHERE id = ?')->execute([$earn, $schoolId]);
+    }
+    if ($spent > 0 && !empty($current['user_id'])) {
+        db()->prepare("UPDATE users SET referral_balance = referral_balance + ? WHERE id = ? AND role = 'school'")
+            ->execute([$spent, (int) $current['user_id']]);
+    }
+    if ($earn > 0 || $spent > 0) {
+        db()->prepare('UPDATE orders SET referral_void = 1 WHERE id = ?')->execute([(int) $current['id']]);
+    }
 }
 
 function school_b2b_percent(): int

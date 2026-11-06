@@ -150,6 +150,9 @@ function render_totals(array $summary): void
         <div><dt>Subtotal</dt><dd><?= money($summary['subtotal']) ?></dd></div>
         <div><dt>Discount<?= !empty($summary['coupon']['code']) ? ' (' . e($summary['coupon']['code']) . ')' : '' ?></dt><dd><?= $summary['discount'] > 0 ? '−' . money($summary['discount']) : money(0) ?></dd></div>
         <div><dt>Delivery</dt><dd><?= (float) $summary['delivery'] > 0 ? money($summary['delivery']) : 'FREE' ?></dd></div>
+        <?php if ((float) ($summary['referral_spent'] ?? 0) > 0): ?>
+            <div><dt>Referral balance</dt><dd>−<?= money($summary['referral_spent']) ?></dd></div>
+        <?php endif; ?>
         <div class="grand"><dt>To pay</dt><dd><?= money($summary['total']) ?></dd></div>
     </dl>
     <?php

@@ -69,6 +69,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     if (!$errors && $action !== 'edit') {
         $quote = price_lines($lines, $coupon !== '' ? $coupon : null, 'bulk', false);
+        if ($quote['ok']) {
+            $quote = attach_referral_preview($quote);
+        }
         if (!$quote['ok']) {
             $errors[] = $quote['error'];
             $quote = null;
@@ -88,7 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ], $lines, $method, 'bulk', $coupon !== '' ? $coupon : null);
             if ($result['ok']) {
                 remember_order_access($result['order']['order_number']);
-                if ($method === 'razorpay') {
+                if ($method === 'razorpay' && (float) $result['order']['total'] > 0) {
                     redirect(url('pay.php?no=' . rawurlencode($result['order']['order_number'])));
                 }
                 redirect(url('order-success.php?no=' . rawurlencode($result['order']['order_number'])));
@@ -112,6 +115,37 @@ require __DIR__ . '/includes/header.php';
             <p class="muted">Parents pay the regular price here. A school login sees B2B prices and can order a class in one go. <a href="<?= e(url('login.php?next=' . urlencode(url('bulk-order.php')))) ?>">School login</a></p>
         <?php endif; ?>
     </div>
+    <?php if (is_school_buyer()): ?>
+        <?php
+        $schoolUser = current_user();
+        $shareUrl = referral_share_url((string) $schoolUser['referral_code']);
+        $earned = db()->prepare('SELECT order_number, customer_name, referral_earn, referral_void, created_at FROM orders WHERE referral_school_id = ? ORDER BY id DESC LIMIT 8');
+        $earned->execute([(int) $schoolUser['id']]);
+        $earnedRows = $earned->fetchAll();
+        ?>
+        <div class="panel" style="margin-bottom:18px">
+            <h2>Referral balance <?= money($schoolUser['referral_balance']) ?></h2>
+            <p>Share this link with parents. When they order, <strong><?= (int) school_referral_percent() ?>%</strong> of their product total is added here. The balance comes off your next school order. A cancelled or failed order removes that amount.</p>
+            <label class="field">Your school link<input id="refLink" readonly value="<?= e($shareUrl) ?>"></label>
+            <button class="btn" type="button" id="copyRef">Copy link</button>
+            <?php if ($earnedRows): ?>
+                <h3>Recent parent orders</h3>
+                <?php foreach ($earnedRows as $row): ?>
+                    <p><?= e($row['order_number']) ?> · <?= e($row['customer_name']) ?> · <?= money($row['referral_earn']) ?><?= (int) $row['referral_void'] ? ' · removed' : '' ?></p>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </div>
+        <script>
+            document.getElementById('copyRef').addEventListener('click', function () {
+                var input = document.getElementById('refLink');
+                input.select();
+                if (navigator.clipboard) {
+                    navigator.clipboard.writeText(input.value);
+                }
+                this.textContent = 'Copied';
+            });
+        </script>
+    <?php endif; ?>
     <?php if ($errors): ?><ul class="errors"><?php foreach ($errors as $error): ?><li><?= e($error) ?></li><?php endforeach; ?></ul><?php endif; ?>
 
     <?php if ($step === 'review' && $quote): ?>
@@ -142,6 +176,7 @@ require __DIR__ . '/includes/header.php';
                     'coupon' => $quote['coupon'],
                     'delivery' => $quote['delivery'],
                     'total' => $quote['total'],
+                    'referral_spent' => $quote['referral_spent'] ?? 0,
                 ]); ?>
                 <p class="small muted"><?= $method === 'cod' ? 'Pay later against the invoice.' : 'You will pay online on the next step.' ?></p>
                 <button class="btn btn-green btn-block" name="action" value="place" type="submit">Place bulk order</button>

@@ -43,6 +43,7 @@ require __DIR__ . '/includes/header.php';
         <p>Subtotal <?= money($order['subtotal']) ?><br>
             Discount <?= money($order['discount']) ?><?= $order['coupon_code'] ? ' (' . e($order['coupon_code']) . ')' : '' ?><br>
             Delivery <?= money($order['delivery_fee']) ?><br>
+            <?php if ((float) $order['referral_spent'] > 0): ?>Referral balance −<?= money($order['referral_spent']) ?><br><?php endif; ?>
             <strong>Total <?= money($order['total']) ?></strong></p>
         <p>Payment <?= e($order['payment_method']) ?> · <?= e($order['payment_status']) ?></p>
         <button class="btn btn-green no-print" type="button" onclick="window.print()">Print invoice</button>

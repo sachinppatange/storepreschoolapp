@@ -89,4 +89,8 @@ $searchValue = trim((string) ($_GET['q'] ?? ''));
 <?php if ($message = flash('error')): ?>
     <div class="wrap"><div class="alert-bad"><?= e($message) ?></div></div>
 <?php endif; ?>
+<?php $activeReferral = current_referral(); ?>
+<?php if ($activeReferral): ?>
+    <div class="wrap"><div class="alert-ok">You are ordering with <?= e($activeReferral['school_name']) ?>'s link. The school earns a thank-you on this order.</div></div>
+<?php endif; ?>
 <main id="main">

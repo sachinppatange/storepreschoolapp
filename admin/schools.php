@@ -28,19 +28,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             db()->prepare('INSERT INTO users (name, email, phone, password_hash, role, school_name, city) VALUES (?, ?, ?, ?, ?, ?, ?)')
                 ->execute([$name, $email, $phone, password_hash($password, PASSWORD_DEFAULT), 'school', $school, $city]);
-            flash('success', $school . ' can log in now. Share the password with the school once.');
+            assign_missing_referral_codes();
+            flash('success', $school . ' can log in now. Share the password once. Their referral link is on this page.');
         }
     }
     redirect(url('admin/schools.php'));
 }
 
-$schools = db()->query("SELECT id, name, email, phone, school_name, city, is_active, created_at FROM users WHERE role = 'school' ORDER BY school_name, name")->fetchAll();
+$schools = db()->query("SELECT id, name, email, phone, school_name, city, is_active, referral_code, referral_balance, created_at FROM users WHERE role = 'school' ORDER BY school_name, name")->fetchAll();
 $active = 'schools';
 $pageTitle = 'Schools';
 require __DIR__ . '/includes/header.php';
 ?>
 <div class="page-head"><h1>School logins</h1></div>
-<p class="muted">A school login sees every product at <?= (int) school_b2b_percent() ?>% below the parent price and can place a bulk order. Parents keep the regular price.</p>
+<p class="muted">A school login sees every product at <?= (int) school_b2b_percent() ?>% below the parent price. Parents who order from that school's link add <?= (int) school_referral_percent() ?>% to the school balance, and the balance comes off the school's own order.</p>
 <div class="layout-2">
     <form method="post" class="panel">
         <?= csrf_field() ?>
@@ -57,7 +58,7 @@ require __DIR__ . '/includes/header.php';
         <h2>Schools</h2>
         <?php if (!$schools): ?><p>No school logins yet.</p><?php endif; ?>
         <?php foreach ($schools as $school): ?>
-            <p><strong><?= e($school['school_name']) ?></strong><br><?= e($school['name']) ?> · <?= e($school['email']) ?><br><?= e($school['phone']) ?> · <?= e($school['city']) ?><?= (int) $school['is_active'] ? '' : ' · disabled' ?></p>
+            <p><strong><?= e($school['school_name']) ?></strong><br><?= e($school['name']) ?> · <?= e($school['email']) ?><br><?= e($school['phone']) ?> · <?= e($school['city']) ?> · Balance <?= money($school['referral_balance']) ?><?= (int) $school['is_active'] ? '' : ' · disabled' ?><br><span class="small"><?= e(referral_share_url((string) $school['referral_code'])) ?></span></p>
         <?php endforeach; ?>
     </div>
 </div>

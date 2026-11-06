@@ -78,7 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ->execute([$data['school_name'], $data['mobile'], $data['address'], $data['city'], $data['pincode'], (int) $user['id']]);
             }
             clear_old();
-            if ($method === 'razorpay') {
+            if ($method === 'razorpay' && (float) $result['order']['total'] > 0) {
                 redirect(url('pay.php?no=' . rawurlencode($result['order']['order_number'])));
             }
             redirect(url('order-success.php?no=' . rawurlencode($result['order']['order_number'])));

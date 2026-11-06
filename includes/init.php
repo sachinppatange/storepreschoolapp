@@ -58,6 +58,7 @@ try {
     ensure_fulfillment_schema();
     ensure_print_schema();
     remember_delivery_from_user(current_user());
+    remember_referral();
 } catch (Throwable $e) {
     render_setup_screen($e->getMessage());
 }
