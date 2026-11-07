@@ -6,6 +6,7 @@ require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/functions.php';
 require_once __DIR__ . '/commerce.php';
 require_once __DIR__ . '/fulfillment.php';
+require_once __DIR__ . '/catalog_seed.php';
 require_once __DIR__ . '/print.php';
 require_once __DIR__ . '/ui.php';
 
@@ -56,6 +57,7 @@ set_exception_handler(static function (Throwable $e): void {
 try {
     db()->query('SELECT 1 FROM users LIMIT 1');
     ensure_fulfillment_schema();
+    ensure_extra_catalog();
     ensure_print_schema();
     remember_delivery_from_user(current_user());
     remember_referral();
